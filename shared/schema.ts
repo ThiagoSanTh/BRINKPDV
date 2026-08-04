@@ -14,7 +14,7 @@ export const products = pgTable("products", {
   sku: text("sku").notNull().unique(),
   name: text("name").notNull(),
   category: text("category").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(), //colocaria como float e trataria no front como decimal
   stock: integer("stock").notNull().default(0),
   image: text("image"),
 });
@@ -26,7 +26,7 @@ export const salespersons = pgTable("salespersons", {
   phone: text("phone").notNull(),
   commission: decimal("commission", { precision: 5, scale: 2 }).notNull(),
   totalSales: decimal("total_sales", { precision: 10, scale: 2 }).notNull().default("0"),
-  active: integer("active").notNull().default(1),
+  active: integer("active").notNull().default(1),// mudar para boolean True/False
   entryDate: date("entry_date").notNull().default(sql`CURRENT_DATE`),
 });
 
@@ -34,7 +34,7 @@ export const sales = pgTable("sales", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   salespersonId: varchar("salesperson_id").references(() => salespersons.id),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-  paymentMethod: text("payment_method").notNull(),
+  paymentMethod: text("payment_method").notNull(),// poderia ser enum 
   items: text("items").notNull(),
   observation: text("observation"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),

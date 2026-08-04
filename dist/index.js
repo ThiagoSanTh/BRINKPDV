@@ -1,15 +1,19 @@
+<<<<<<< HEAD
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+=======
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
 // server/index.ts
 import express from "express";
 
 // server/routes.ts
 import { createServer } from "http";
 
+<<<<<<< HEAD
 // server/db.ts
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -632,15 +636,89 @@ async function registerRoutes(app2) {
     try {
       const sales2 = await storage.getSales();
       res.json(sales2);
+=======
+// server/storage.ts
+import { randomUUID } from "crypto";
+var MemStorage = class {
+  users;
+  sales;
+  salespersons;
+  constructor() {
+    this.users = /* @__PURE__ */ new Map();
+    this.sales = /* @__PURE__ */ new Map();
+    this.salespersons = /* @__PURE__ */ new Map();
+  }
+  async getUser(id) {
+    return this.users.get(id);
+  }
+  async getUserByUsername(username) {
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username
+    );
+  }
+  async createUser(insertUser) {
+    const id = randomUUID();
+    const user = { ...insertUser, id };
+    this.users.set(id, user);
+    return user;
+  }
+  async getSales() {
+    return Array.from(this.sales.values());
+  }
+  async getTodaySales() {
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    return Array.from(this.sales.values()).filter((sale) => {
+      const saleDate = new Date(sale.createdAt);
+      saleDate.setHours(0, 0, 0, 0);
+      return saleDate.getTime() === today.getTime();
+    });
+  }
+  async getSaleById(id) {
+    return this.sales.get(id);
+  }
+  async createSale(insertSale) {
+    const id = randomUUID();
+    const sale = {
+      ...insertSale,
+      salespersonId: insertSale.salespersonId || null,
+      observation: insertSale.observation || null,
+      id,
+      createdAt: /* @__PURE__ */ new Date()
+    };
+    this.sales.set(id, sale);
+    return sale;
+  }
+  async getSalespersonById(id) {
+    return this.salespersons.get(id);
+  }
+};
+var storage = new MemStorage();
+
+// server/routes.ts
+async function registerRoutes(app2) {
+  app2.get("/api/sales", async (req, res) => {
+    try {
+      const sales = await storage.getSales();
+      res.json(sales);
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch sales" });
     }
   });
+<<<<<<< HEAD
   app2.get("/api/sales/today", async (_req, res) => {
     try {
       const sales2 = await storage.getTodaySales();
       const salesWithDetails = await Promise.all(
         sales2.map(async (sale) => {
+=======
+  app2.get("/api/sales/today", async (req, res) => {
+    try {
+      const sales = await storage.getTodaySales();
+      const salesWithDetails = await Promise.all(
+        sales.map(async (sale) => {
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
           let salespersonName = void 0;
           if (sale.salespersonId) {
             const salesperson = await storage.getSalespersonById(sale.salespersonId);
@@ -670,6 +748,7 @@ async function registerRoutes(app2) {
 }
 
 // server/index.ts
+<<<<<<< HEAD
 import fs2 from "fs";
 import path2 from "path";
 
@@ -739,6 +818,10 @@ function scheduleSync() {
 }
 
 // server/index.ts
+=======
+import fs from "fs";
+import path from "path";
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
 if (!process.env.NODE_ENV) {
   const npmScript = process.env.npm_lifecycle_event;
   if (npmScript === "start") {
@@ -758,15 +841,24 @@ function log(message, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 function serveStatic(app2) {
+<<<<<<< HEAD
   const distPath = path2.resolve(import.meta.dirname, "..", "client", "dist");
   if (!fs2.existsSync(distPath)) {
+=======
+  const distPath = path.resolve(import.meta.dirname, "..", "client", "dist");
+  if (!fs.existsSync(distPath)) {
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
   app2.use(express.static(distPath));
   app2.use("*", (_req, res) => {
+<<<<<<< HEAD
     res.sendFile(path2.resolve(distPath, "index.html"));
+=======
+    res.sendFile(path.resolve(distPath, "index.html"));
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
   });
 }
 var app = express();
@@ -774,7 +866,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => {
   const start = Date.now();
+<<<<<<< HEAD
   const path3 = req.path;
+=======
+  const path2 = req.path;
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
   let capturedJsonResponse = void 0;
   const originalResJson = res.json;
   res.json = function(bodyJson, ...args) {
@@ -783,8 +879,13 @@ app.use((req, res, next) => {
   };
   res.on("finish", () => {
     const duration = Date.now() - start;
+<<<<<<< HEAD
     if (path3.startsWith("/api")) {
       let logLine = `${req.method} ${path3} ${res.statusCode} in ${duration}ms`;
+=======
+    if (path2.startsWith("/api")) {
+      let logLine = `${req.method} ${path2} ${res.statusCode} in ${duration}ms`;
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -797,8 +898,11 @@ app.use((req, res, next) => {
   next();
 });
 (async () => {
+<<<<<<< HEAD
   logDatabaseStatus();
   scheduleSync();
+=======
+>>>>>>> b6ea756efb67345bda2263b0f14deb536b617b7e
   const server = await registerRoutes(app);
   app.use((err, _req, res, _next) => {
     const status = err.status || err.statusCode || 500;
