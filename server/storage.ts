@@ -1,93 +1,188 @@
-import { 
-  type User, 
+import {
+  type User,
   type InsertUser,
   type Sale,
   type InsertSale,
-  type Salesperson
+  type Salesperson,
+  type Product,
+  type InsertProduct,
 } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db, isDatabaseConfigured } from "./db";
+import { SqliteStorage } from "./storage-sqlite";
+import { PostgresStorage } from "./storage-postgres";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
-  // Sales methods
+
+  getProducts(): Promise<Product[]>;
+  getProductById(id: string): Promise<Product | undefined>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(id: string): Promise<void>;
+
   getSales(): Promise<Sale[]>;
   getTodaySales(): Promise<Sale[]>;
   getSaleById(id: string): Promise<Sale | undefined>;
   createSale(sale: InsertSale): Promise<Sale>;
-  
-  // Salesperson methods
+
   getSalespersonById(id: string): Promise<Salesperson | undefined>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private sales: Map<string, Sale>;
-  private salespersons: Map<string, Salesperson>;
+export class HybridStorage implements IStorage {
+  private readonly sqliteStorage = new SqliteStorage();
+  private readonly postgresStorage = new PostgresStorage(db as any);
 
-  constructor() {
-    this.users = new Map();
-    this.sales = new Map();
-    this.salespersons = new Map();
+  private async readWithFallback<T>(
+    remoteRead: () => Promise<T>,
+    localRead: () => Promise<T>,
+  ): Promise<T> {
+    if (!isDatabaseConfigured()) {
+      return localRead();
+    }
+
+    try {
+      return await remoteRead();
+    } catch (error) {
+      console.warn("[STORAGE] Falha no Postgres/Supabase, usando fallback local do SQLite.", error);
+      return localRead();
+    }
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+    return this.readWithFallback(
+      () => this.postgresStorage.getUser(id),
+      () => this.sqliteStorage.getUser(id),
     );
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return this.readWithFallback(
+      () => this.postgresStorage.getUserByUsername(username),
+      () => this.sqliteStorage.getUserByUsername(username),
+    );
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const localUser = await this.sqliteStorage.createUser(user);
+
+    if (!isDatabaseConfigured()) {
+      return localUser;
+    }
+
+    try {
+      await this.postgresStorage.createUser(localUser as any);
+    } catch (error) {
+      console.warn("[STORAGE] Não foi possível sincronizar usuário com o Postgres/Supabase.", error);
+    }
+
+    return localUser;
+  }
+
+  async getProducts(): Promise<Product[]> {
+    return this.readWithFallback(
+      () => this.postgresStorage.getProducts(),
+      () => this.sqliteStorage.getProducts(),
+    );
+  }
+
+  async getProductById(id: string): Promise<Product | undefined> {
+    return this.readWithFallback(
+      () => this.postgresStorage.getProductById(id),
+      () => this.sqliteStorage.getProductById(id),
+    );
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const localProduct = await this.sqliteStorage.createProduct(product);
+
+    if (!isDatabaseConfigured()) {
+      return localProduct;
+    }
+
+    try {
+      await this.postgresStorage.createProduct(localProduct as any);
+    } catch (error) {
+      console.warn("[STORAGE] Não foi possível sincronizar produto com o Postgres/Supabase.", error);
+    }
+
+    return localProduct;
+  }
+
+  async updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined> {
+    const localProduct = await this.sqliteStorage.updateProduct(id, product);
+
+    if (!isDatabaseConfigured()) {
+      return localProduct;
+    }
+
+    try {
+      await this.postgresStorage.updateProduct(id, product);
+    } catch (error) {
+      console.warn("[STORAGE] Não foi possível sincronizar atualização de produto.", error);
+    }
+
+    return localProduct;
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    await this.sqliteStorage.deleteProduct(id);
+
+    if (!isDatabaseConfigured()) {
+      return;
+    }
+
+    try {
+      await this.postgresStorage.deleteProduct(id);
+    } catch (error) {
+      console.warn("[STORAGE] Não foi possível remover produto no Postgres/Supabase.", error);
+    }
   }
 
   async getSales(): Promise<Sale[]> {
-    return Array.from(this.sales.values());
+    return this.readWithFallback(
+      () => this.postgresStorage.getSales(),
+      () => this.sqliteStorage.getSales(),
+    );
   }
 
   async getTodaySales(): Promise<Sale[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    return Array.from(this.sales.values()).filter(sale => {
-      const saleDate = new Date(sale.createdAt);
-      saleDate.setHours(0, 0, 0, 0);
-      return saleDate.getTime() === today.getTime();
-    });
+    return this.readWithFallback(
+      () => this.postgresStorage.getTodaySales(),
+      () => this.sqliteStorage.getTodaySales(),
+    );
   }
 
   async getSaleById(id: string): Promise<Sale | undefined> {
-    return this.sales.get(id);
+    return this.readWithFallback(
+      () => this.postgresStorage.getSaleById(id),
+      () => this.sqliteStorage.getSaleById(id),
+    );
   }
 
-  async createSale(insertSale: InsertSale): Promise<Sale> {
-    const id = randomUUID();
-    const sale: Sale = { 
-      ...insertSale,
-      salespersonId: insertSale.salespersonId || null,
-      observation: insertSale.observation || null,
-      id,
-      createdAt: new Date()
-    };
-    this.sales.set(id, sale);
-    return sale;
+  async createSale(sale: InsertSale): Promise<Sale> {
+    const localSale = await this.sqliteStorage.createSale(sale);
+
+    if (!isDatabaseConfigured()) {
+      return localSale;
+    }
+
+    try {
+      await this.postgresStorage.createSale(localSale as any);
+    } catch (error) {
+      console.warn("[STORAGE] Não foi possível sincronizar a venda com o Postgres/Supabase.", error);
+    }
+
+    return localSale;
   }
 
   async getSalespersonById(id: string): Promise<Salesperson | undefined> {
-    return this.salespersons.get(id);
+    return this.readWithFallback(
+      () => this.postgresStorage.getSalespersonById(id),
+      () => this.sqliteStorage.getSalespersonById(id),
+    );
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new HybridStorage();

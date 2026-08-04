@@ -54,7 +54,7 @@ function startServer() {
 
   if (isDev) {
     // Em desenvolvimento, spawna processo separado com tsx
-    const serverScript = path.join(__dirname, 'server', 'index.ts');
+    const serverScript = path.join(__dirname, '..', 'server', 'index.ts');
     const serverCommand = 'npx';
     const serverArgs = ['tsx', serverScript];
     const spawnOptions = {
@@ -84,7 +84,7 @@ function startServer() {
   } else {
     // Em produção, carrega servidor no mesmo processo (não precisa de Node.js separado)
     // No executável empacotado (asar:false), os arquivos ficam em __dirname
-    const distPath = path.join(__dirname, 'dist', 'index.js');
+    const distPath = path.join(__dirname, '..', 'dist', 'index.js');
     
     if (!fs.existsSync(distPath)) {
       const errorMsg = 'Arquivo do servidor não encontrado';

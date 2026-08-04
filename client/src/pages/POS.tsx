@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,14 +33,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const mockProducts: any[] = [];
-const mockSalespersons: any[] = [];
+interface ProductRecord {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+  barcode?: string;
+  image?: string;
+}
 
 interface CartItemType {
   id: string;
   name: string;
   price: number;
   quantity: number;
+  discount: number;
 }
 
 export default function POS() {
@@ -54,57 +65,67 @@ export default function POS() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [selectedSalesperson, setSelectedSalesperson] = useState("");
 
-  // Extrair categorias únicas dos produtos
-  const categories = ["all", ...Array.from(new Set(mockProducts.map(p => p.category)))];
+  const { data: products = [], isLoading } = useQuery<ProductRecord[]>({
+    queryKey: ["/api/products"],
+  });
 
-  const filteredProducts = mockProducts.filter(p => {
-    const matchesSearch = 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesBarcode = barcodeSearch 
-      ? p.barcode?.includes(barcodeSearch) 
-      : true;
-    
-    const matchesCategory = selectedCategory === "all" 
-      ? true 
-      : p.category === selectedCategory;
+  const salespersons = useMemo(() => [{ id: "salesperson-default", name: "Vendedor Padrão" }], []);
+
+  useEffect(() => {
+    if (salespersons.length > 0 && !selectedSalesperson) {
+      setSelectedSalesperson(salespersons[0].id);
+    }
+  }, [salespersons, selectedSalesperson]);
+
+  const categories = useMemo(() => ["all", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
+
+  const filteredProducts = products.filter((p) => {
+    const search = searchTerm.toLowerCase();
+    const matchesSearch =
+      p.name.toLowerCase().includes(search) ||
+      p.category.toLowerCase().includes(search) ||
+      p.sku.toLowerCase().includes(search);
+
+    const matchesBarcode = barcodeSearch ? (p.sku?.toLowerCase().includes(barcodeSearch.toLowerCase()) || p.id?.toLowerCase().includes(barcodeSearch.toLowerCase())) : true;
+
+    const matchesCategory = selectedCategory === "all" ? true : p.category === selectedCategory;
 
     return matchesSearch && matchesBarcode && matchesCategory;
   });
 
   const handleAddToCart = (productId: string) => {
-    const product = mockProducts.find(p => p.id === productId);
+    const product = products.find((p) => p.id === productId);
     if (!product) return;
 
-    const existingItem = cart.find(item => item.id === productId);
-    if (existingItem) {
-      setCart(cart.map(item =>
-        item.id === productId ? { ...item, quantity: item.quantity + 1 } : item
-      ));
-    } else {
-      setCart([...cart, { id: product.id, name: product.name, price: product.price, quantity: 1 }]);
-    }
+    setCart((prev) => {
+      const existingItem = prev.find((item) => item.id === productId);
+      if (existingItem) {
+        return prev.map((item) => item.id === productId ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+
+      return [...prev, { id: product.id, name: product.name, price: product.price, quantity: 1, discount: 0 }];
+    });
   };
 
   const handleIncrement = (id: string) => {
-    setCart(cart.map(item =>
-      item.id === id ? { ...item, quantity: item.quantity + 1 } : item
-    ));
+    setCart((prev) => prev.map((item) => item.id === id ? { ...item, quantity: item.quantity + 1 } : item));
   };
 
   const handleDecrement = (id: string) => {
-    setCart(cart.map(item =>
-      item.id === id && item.quantity > 1 ? { ...item, quantity: item.quantity - 1 } : item
-    ));
+    setCart((prev) => prev.map((item) => item.id === id && item.quantity > 1 ? { ...item, quantity: item.quantity - 1 } : item));
   };
 
   const handleRemove = (id: string) => {
-    setCart(cart.filter(item => item.id !== id));
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleDiscountChange = (id: string, value: number) => {
+    setCart((prev) => prev.map((item) => item.id === id ? { ...item, discount: Math.max(0, value) } : item));
   };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const total = subtotal;
+  const discountTotal = cart.reduce((sum, item) => sum + item.discount, 0);
+  const total = Math.max(0, subtotal - discountTotal);
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
@@ -116,19 +137,31 @@ export default function POS() {
     setShowPaymentDialog(true);
   };
 
-  const handlePayment = () => {
-    console.log("Payment processed", { 
-      paymentMethod, 
-      observation, 
-      salesperson: mockSalespersons.find(s => s.id === selectedSalesperson)?.name 
-    });
+  const handlePayment = async () => {
+    if (cart.length === 0) return;
+
+    const salePayload = {
+      salespersonId: selectedSalesperson || "salesperson-default",
+      total: total.toFixed(2),
+      paymentMethod: paymentMethod === "dinheiro" ? "Dinheiro" : paymentMethod === "credito" ? "Crédito" : paymentMethod === "debito" ? "Débito" : "PIX",
+      items: cart.map((item) => ({
+        productId: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        discount: item.discount,
+      })),
+      observation,
+    };
+
+    await apiRequest("POST", "/api/sales", salePayload);
     setCart([]);
     setShowPaymentDialog(false);
     setShowObservationDialog(false);
     setPaymentAmount("");
     setPaymentMethod("dinheiro");
     setObservation("");
-    setSelectedSalesperson("");
+    setSelectedSalesperson(salespersons[0]?.id || "");
   };
 
   const change = paymentAmount ? parseFloat(paymentAmount) - total : 0;
@@ -150,7 +183,7 @@ export default function POS() {
               <SelectValue placeholder="Selecione o vendedor" />
             </SelectTrigger>
             <SelectContent>
-              {mockSalespersons.map((salesperson) => (
+              {salespersons.map((salesperson) => (
                 <SelectItem key={salesperson.id} value={salesperson.id}>
                   {salesperson.name}
                 </SelectItem>
@@ -253,10 +286,15 @@ export default function POS() {
         </div>
 
         <div className="flex-1 overflow-auto">
-          {filteredProducts.length === 0 ? (
+          {isLoading ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
               <Package className="h-16 w-16 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium text-muted-foreground mb-2">Nenhum produto cadastrado</p>
+              <p className="text-lg font-medium text-muted-foreground mb-2">Carregando produtos...</p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center py-12">
+              <Package className="h-16 w-16 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium text-muted-foreground mb-2">Nenhum produto encontrado</p>
               <p className="text-sm text-muted-foreground">
                 Cadastre produtos na seção "Produtos" para começar a vender
               </p>
@@ -331,13 +369,25 @@ export default function POS() {
           ) : (
             <div className="space-y-1">
               {cart.map((item) => (
-                <CartItem
-                  key={item.id}
-                  {...item}
-                  onIncrement={handleIncrement}
-                  onDecrement={handleDecrement}
-                  onRemove={handleRemove}
-                />
+                <div key={item.id} className="space-y-2">
+                  <CartItem
+                    {...item}
+                    onIncrement={handleIncrement}
+                    onDecrement={handleDecrement}
+                    onRemove={handleRemove}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Desconto</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.discount}
+                      onChange={(e) => handleDiscountChange(item.id, Number(e.target.value || 0))}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -349,6 +399,10 @@ export default function POS() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-mono">R$ {subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Desconto</span>
+                <span className="font-mono">R$ {discountTotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>

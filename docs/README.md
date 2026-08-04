@@ -153,6 +153,17 @@ Senha: admin
 
 ## 📚 Documentação
 
+### Estrutura do projeto
+
+- app/: fluxo principal da aplicação
+- client/: frontend React/TypeScript
+- server/: backend Express e APIs
+- core/: regras de negócio e modelos centrais
+- infra/: banco, sincronização e infraestrutura
+- data/: dados locais e arquivos de persistência
+- docs/: documentação
+- shared/: schemas e tipos compartilhados
+
 ### Arquivos de Documentação
 
 - **`DOWNLOAD.md`** - Como baixar e preparar o sistema

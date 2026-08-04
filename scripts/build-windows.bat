@@ -46,14 +46,14 @@ echo Arquivos de build verificados com sucesso!
 
 echo.
 echo Passo 4: Verificando icone...
-if not exist "icon.ico" (
+if not exist "desktop\icon.ico" (
     echo AVISO: Icone nao encontrado. Usando icone padrao.
 )
 
 echo.
 echo Passo 5: Gerando executavel Windows...
 echo Isso pode demorar 5-10 minutos na primeira vez...
-call npx electron-builder --win --x64 --config electron-builder.json
+call npx electron-builder --win --x64 --config config\electron-builder.json
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo Erro ao gerar executavel!

@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import fs from "fs";
 import path from "path";
+import { logDatabaseStatus } from "./db-init";
+import { scheduleSync } from "./sync";
 
 // Auto-detect environment if NODE_ENV is not set (Windows compatibility)
 if (!process.env.NODE_ENV) {
@@ -79,6 +81,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  logDatabaseStatus();
+  scheduleSync();
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

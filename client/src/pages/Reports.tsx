@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { SalesChart } from "@/components/SalesChart";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,40 +24,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-//todo: remove mock functionality
-const mockSalesData = [
-  { date: "05/10", value: 8234 },
-  { date: "06/10", value: 9845 },
-  { date: "07/10", value: 7621 },
-  { date: "08/10", value: 11234 },
-  { date: "09/10", value: 10987 },
-  { date: "10/10", value: 13450 },
-  { date: "11/10", value: 12450 },
-];
-
-const mockTopProducts: any[] = [];
-
-// Mock data for products sold by period
-const mockPeriodProducts = [
-  {
-    id: 1,
-    name: "Produto Exemplo A",
-    total: 1500.00,
-    credit: 800.00,
-    debit: 400.00,
-    pix: 200.00,
-    cash: 100.00,
-  },
-  {
-    id: 2,
-    name: "Produto Exemplo B",
-    total: 2300.00,
-    credit: 1200.00,
-    debit: 600.00,
-    pix: 300.00,
-    cash: 200.00,
-  },
-];
+type SaleRecord = {
+  id: string;
+  total: string | number;
+  paymentMethod: string;
+  createdAt: string | Date;
+  items?: Array<{ name: string; quantity: number; price: number; discount?: number }>;
+};
 
 export default function Reports() {
   const [, setLocation] = useLocation();
@@ -68,6 +42,7 @@ export default function Reports() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState<{ start: string; end: string } | null>(null);
+  const { data: sales = [] } = useQuery<SaleRecord[]>({ queryKey: ["/api/sales"] });
 
   const handleUnlock = () => {
     if (password === "admin") {
@@ -112,11 +87,69 @@ export default function Reports() {
     });
   };
 
+  const filteredSales = useMemo(() => {
+    if (!selectedPeriod) return sales;
+    const start = new Date(selectedPeriod.start);
+    const end = new Date(selectedPeriod.end);
+    end.setHours(23, 59, 59, 999);
+    return sales.filter((sale) => {
+      const createdAt = new Date(sale.createdAt);
+      return createdAt >= start && createdAt <= end;
+    });
+  }, [sales, selectedPeriod]);
+
+  const salesChartData = useMemo(() => {
+    const last7Days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - index));
+      return {
+        date: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+        value: 0,
+      };
+    });
+
+    filteredSales.forEach((sale) => {
+      const createdAt = new Date(sale.createdAt);
+      const key = createdAt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+      const entry = last7Days.find((item) => item.date === key);
+      if (entry) {
+        entry.value += Number(sale.total);
+      }
+    });
+
+    return last7Days;
+  }, [filteredSales]);
+
+  const periodProducts = useMemo(() => {
+    const grouped: Record<string, any> = {};
+    filteredSales.forEach((sale) => {
+      (sale.items || []).forEach((item) => {
+        if (!grouped[item.name]) {
+          grouped[item.name] = {
+            id: item.name,
+            name: item.name,
+            total: 0,
+            credit: 0,
+            debit: 0,
+            pix: 0,
+            cash: 0,
+          };
+        }
+        const amount = Number(item.quantity || 0) * Number(item.price || 0);
+        grouped[item.name].total += amount;
+        if (sale.paymentMethod === "Crédito") grouped[item.name].credit += amount;
+        if (sale.paymentMethod === "Débito") grouped[item.name].debit += amount;
+        if (sale.paymentMethod === "PIX") grouped[item.name].pix += amount;
+        if (sale.paymentMethod === "Dinheiro") grouped[item.name].cash += amount;
+      });
+    });
+    return Object.values(grouped);
+  }, [filteredSales]);
+
   const handleExport = () => {
-    // Gerar CSV com os dados do relatório
     const csvData = [
-      ['Produto', 'Quantidade', 'Receita'],
-      ...mockTopProducts.map(p => [p.name, p.qty, p.revenue.toFixed(2)])
+      ["Produto", "Quantidade", "Receita"],
+      ...periodProducts.map((p) => [p.name, p.total.toFixed(2), p.total.toFixed(2)])
     ];
 
     const csvContent = csvData.map(row => row.join(',')).join('\n');
@@ -242,7 +275,7 @@ export default function Reports() {
             <h3 className="text-lg font-semibold mb-4">
               Produtos Vendidos no Período - {new Date(selectedPeriod.start).toLocaleDateString('pt-BR')} até {new Date(selectedPeriod.end).toLocaleDateString('pt-BR')}
             </h3>
-            {mockPeriodProducts.length === 0 ? (
+            {periodProducts.length === 0 ? (
               <div className="py-12 text-center">
                 <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-20" />
                 <p className="text-muted-foreground">Nenhum produto vendido no período selecionado</p>
@@ -281,7 +314,7 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockPeriodProducts.map((product) => (
+                    {periodProducts.map((product) => (
                       <TableRow key={product.id} data-testid={`row-period-product-${product.id}`}>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell className="text-right font-mono font-bold text-primary">
@@ -309,13 +342,13 @@ export default function Reports() {
         </Card>
       )}
 
-      <SalesChart data={mockSalesData} title="Vendas dos últimos 7 dias" />
+      <SalesChart data={salesChartData} title="Vendas dos últimos 7 dias" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card data-testid="card-top-products">
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Produtos Mais Vendidos</h3>
-            {mockTopProducts.length === 0 ? (
+            {periodProducts.length === 0 ? (
               <div className="py-12 text-center">
                 <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-20" />
                 <p className="text-muted-foreground">Nenhum produto vendido no período</p>
@@ -331,7 +364,7 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockTopProducts.map((product) => (
+                    {periodProducts.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell className="text-right font-mono">{product.qty}</TableCell>

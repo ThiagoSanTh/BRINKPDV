@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { StatsCard } from "@/components/StatsCard";
 import { SalesChart } from "@/components/SalesChart";
 import { DollarSign, ShoppingCart, Package, AlertTriangle, CreditCard, Smartphone, Wallet, TrendingUp, TrendingDown } from "lucide-react";
@@ -19,8 +20,13 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
-const mockSalesData: any[] = [];
-const mockRecentSales: any[] = [];
+type SaleRecord = {
+  id: string;
+  total: string | number;
+  paymentMethod: string;
+  createdAt: string | Date;
+  items?: Array<{ name: string; quantity: number; price: number }>;
+};
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -34,6 +40,7 @@ export default function Dashboard() {
   const [entryDescription, setEntryDescription] = useState("");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalDescription, setWithdrawalDescription] = useState("");
+  const { data: sales = [] } = useQuery<SaleRecord[]>({ queryKey: ["/api/sales/today"] });
 
   const handleCashEntry = () => {
     const amount = parseFloat(entryAmount);
@@ -80,6 +87,28 @@ export default function Dashboard() {
   };
 
   const cashBalance = cashIn - cashOut;
+  const todaySales = useMemo(() => sales as SaleRecord[], [sales]);
+  const totalSalesValue = useMemo(() => todaySales.reduce((sum, sale) => sum + Number(sale.total), 0), [todaySales]);
+  const salesByPayment = useMemo(() => {
+    return todaySales.reduce((acc, sale) => {
+      acc[sale.paymentMethod] = (acc[sale.paymentMethod] || 0) + Number(sale.total);
+      return acc;
+    }, {} as Record<string, number>);
+  }, [todaySales]);
+  const recentSales = useMemo(() => todaySales.slice(0, 5), [todaySales]);
+  const salesChartData = useMemo(() => {
+    const last7Days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - index));
+      return { date: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), value: 0 };
+    });
+    todaySales.forEach((sale) => {
+      const key = new Date(sale.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+      const entry = last7Days.find((item) => item.date === key);
+      if (entry) entry.value += Number(sale.total);
+    });
+    return last7Days;
+  }, [todaySales]);
 
   return (
     <div className="space-y-6">
@@ -94,7 +123,7 @@ export default function Dashboard() {
         <div onClick={() => setLocation("/reports")} className="cursor-pointer" data-testid="clickable-card-sales-today">
           <StatsCard
             title="Vendas Hoje"
-            value="R$ 0,00"
+            value={`R$ ${totalSalesValue.toFixed(2).replace('.', ',')}`}
             icon={DollarSign}
           />
         </div>
@@ -132,10 +161,10 @@ export default function Dashboard() {
                     Crédito
                   </p>
                   <p className="text-2xl font-bold mt-2 font-mono">
-                    R$ 0,00
+                    R$ {((salesByPayment["Crédito"] || 0)).toFixed(2).replace('.', ',')}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    0% do total
+                    {totalSalesValue > 0 ? `${(((salesByPayment["Crédito"] || 0) / totalSalesValue) * 100).toFixed(1)}% do total` : '0% do total'}
                   </p>
                 </div>
                 <div className="flex-shrink-0">
@@ -155,10 +184,10 @@ export default function Dashboard() {
                     Débito
                   </p>
                   <p className="text-2xl font-bold mt-2 font-mono">
-                    R$ 0,00
+                    R$ {((salesByPayment["Débito"] || 0)).toFixed(2).replace('.', ',')}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    0% do total
+                    {totalSalesValue > 0 ? `${(((salesByPayment["Débito"] || 0) / totalSalesValue) * 100).toFixed(1)}% do total` : '0% do total'}
                   </p>
                 </div>
                 <div className="flex-shrink-0">
@@ -178,10 +207,10 @@ export default function Dashboard() {
                     PIX
                   </p>
                   <p className="text-2xl font-bold mt-2 font-mono">
-                    R$ 0,00
+                    R$ {((salesByPayment["PIX"] || 0)).toFixed(2).replace('.', ',')}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    0% do total
+                    {totalSalesValue > 0 ? `${(((salesByPayment["PIX"] || 0) / totalSalesValue) * 100).toFixed(1)}% do total` : '0% do total'}
                   </p>
                 </div>
                 <div className="flex-shrink-0">
@@ -201,10 +230,10 @@ export default function Dashboard() {
                     Dinheiro
                   </p>
                   <p className="text-2xl font-bold mt-2 font-mono">
-                    R$ 0,00
+                    R$ {((salesByPayment["Dinheiro"] || 0)).toFixed(2).replace('.', ',')}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    0% do total
+                    {totalSalesValue > 0 ? `${(((salesByPayment["Dinheiro"] || 0) / totalSalesValue) * 100).toFixed(1)}% do total` : '0% do total'}
                   </p>
                 </div>
                 <div className="flex-shrink-0">
@@ -220,31 +249,31 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <SalesChart data={mockSalesData} />
+          <SalesChart data={salesChartData} />
         </div>
 
         <Card data-testid="card-recent-sales">
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Vendas Recentes</h3>
-            {mockRecentSales.length === 0 ? (
+            {recentSales.length === 0 ? (
               <div className="py-8 text-center">
                 <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground text-sm">Nenhuma venda realizada hoje</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {mockRecentSales.map((sale) => (
+                {recentSales.map((sale) => (
                   <div
                     key={sale.id}
                     className="flex items-center justify-between py-2 border-b last:border-0"
                     data-testid={`recent-sale-${sale.id}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{sale.product}</p>
-                      <p className="text-xs text-muted-foreground">{sale.time}</p>
+                      <p className="font-medium text-sm truncate">{sale.items?.[0]?.name || "Venda"}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(sale.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
                     </div>
                     <p className="font-mono font-semibold text-sm text-primary">
-                      R$ {sale.value.toFixed(2)}
+                      R$ {Number(sale.total).toFixed(2)}
                     </p>
                   </div>
                 ))}
