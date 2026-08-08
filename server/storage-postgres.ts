@@ -5,13 +5,16 @@ import {
   products,
   salespersons,
   sales,
+  serviceOrders,
   type InsertUser,
   type InsertSale,
+  type InsertServiceOrder,
   type User,
   type Sale,
   type Salesperson,
   type InsertProduct,
   type Product,
+  type ServiceOrder,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -29,6 +32,10 @@ export interface IStorage {
   getSaleById(id: string): Promise<Sale | undefined>;
   createSale(sale: InsertSale): Promise<Sale>;
   getSalespersonById(id: string): Promise<Salesperson | undefined>;
+  getServiceOrders(): Promise<ServiceOrder[]>;
+  getServiceOrderById(id: string): Promise<ServiceOrder | undefined>;
+  createServiceOrder(order: InsertServiceOrder): Promise<ServiceOrder>;
+  updateServiceOrder(id: string, order: Partial<InsertServiceOrder>): Promise<ServiceOrder | undefined>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -143,5 +150,50 @@ export class PostgresStorage implements IStorage {
     if (!this.dbClient) return undefined;
     const rows = await this.dbClient.select().from(salespersons).where(eq(salespersons.id, id)).limit(1);
     return rows[0] as Salesperson | undefined;
+  }
+
+  async getServiceOrders(): Promise<ServiceOrder[]> {
+    if (!this.dbClient) return [];
+    const rows = await this.dbClient.select().from(serviceOrders);
+    return rows as ServiceOrder[];
+  }
+
+  async getServiceOrderById(id: string): Promise<ServiceOrder | undefined> {
+    if (!this.dbClient) return undefined;
+    const rows = await this.dbClient.select().from(serviceOrders).where(eq(serviceOrders.id, id)).limit(1);
+    return rows[0] as ServiceOrder | undefined;
+  }
+
+  async createServiceOrder(insertOrder: InsertServiceOrder): Promise<ServiceOrder> {
+    if (!this.dbClient) {
+      throw new Error("Database is not configured");
+    }
+
+    const id = randomUUID();
+    const order = {
+      ...insertOrder,
+      id,
+      serial: insertOrder.serial ?? null,
+      exitDate: insertOrder.exitDate ?? null,
+    } as ServiceOrder;
+
+    await this.dbClient.insert(serviceOrders).values(order);
+    return order;
+  }
+
+  async updateServiceOrder(id: string, update: Partial<InsertServiceOrder>): Promise<ServiceOrder | undefined> {
+    if (!this.dbClient) return undefined;
+    const existing = await this.getServiceOrderById(id);
+    if (!existing) return undefined;
+
+    const next = {
+      ...existing,
+      ...update,
+      serial: update.serial ?? existing.serial ?? null,
+      exitDate: update.exitDate ?? existing.exitDate ?? null,
+    } as ServiceOrder;
+
+    await this.dbClient.update(serviceOrders).set(next).where(eq(serviceOrders.id, id));
+    return next;
   }
 }

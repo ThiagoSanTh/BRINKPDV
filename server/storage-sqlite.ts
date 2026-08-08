@@ -3,11 +3,13 @@ import { sqliteDb } from "./db-sqlite";
 import {
   type InsertUser,
   type InsertSale,
+  type InsertServiceOrder,
   type User,
   type Sale,
   type Salesperson,
   type Product,
   type InsertProduct,
+  type ServiceOrder,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -24,6 +26,10 @@ export interface IStorage {
   getSaleById(id: string): Promise<Sale | undefined>;
   createSale(sale: InsertSale): Promise<Sale>;
   getSalespersonById(id: string): Promise<Salesperson | undefined>;
+  getServiceOrders(): Promise<ServiceOrder[]>;
+  getServiceOrderById(id: string): Promise<ServiceOrder | undefined>;
+  createServiceOrder(order: InsertServiceOrder): Promise<ServiceOrder>;
+  updateServiceOrder(id: string, order: Partial<InsertServiceOrder>): Promise<ServiceOrder | undefined>;
 }
 
 export class SqliteStorage implements IStorage {
@@ -70,13 +76,14 @@ export class SqliteStorage implements IStorage {
       ...insertProduct,
       id,
       image: insertProduct.image ?? null,
+      barcode: insertProduct.barcode ?? null,
       stock: Number(insertProduct.stock ?? 0),
       price: Number(insertProduct.price),
     } as Product;
 
     sqliteDb.prepare(
-      'INSERT INTO products (id, sku, name, category, price, stock, image) VALUES (?, ?, ?, ?, ?, ?, ?)' 
-    ).run(product.id, product.sku, product.name, product.category, product.price.toString(), product.stock, product.image ?? null);
+      'INSERT INTO products (id, sku, name, category, price, stock, barcode, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(product.id, product.sku, product.name, product.category, product.price.toString(), product.stock, product.barcode ?? null, product.image ?? null);
 
     return product;
   }
@@ -93,8 +100,8 @@ export class SqliteStorage implements IStorage {
     } as Product;
 
     sqliteDb.prepare(
-      'UPDATE products SET sku = ?, name = ?, category = ?, price = ?, stock = ?, image = ? WHERE id = ?'
-    ).run(next.sku, next.name, next.category, next.price.toString(), next.stock, next.image ?? null, id);
+      'UPDATE products SET sku = ?, name = ?, category = ?, price = ?, stock = ?, barcode = ?, image = ? WHERE id = ?'
+    ).run(next.sku, next.name, next.category, next.price.toString(), next.stock, next.barcode ?? null, next.image ?? null, id);
 
     return next;
   }
@@ -173,5 +180,108 @@ export class SqliteStorage implements IStorage {
   async getSalespersonById(id: string): Promise<Salesperson | undefined> {
     const row = sqliteDb.prepare('SELECT * FROM salespersons WHERE id = ?').get(id) as any;
     return row ? ({ ...row, id: row.id, commission: row.commission, totalSales: row.total_sales, active: Boolean(row.active), entryDate: row.entry_date }) as Salesperson : undefined;
+  }
+
+  async getServiceOrders(): Promise<ServiceOrder[]> {
+    const rows = sqliteDb.prepare('SELECT * FROM service_orders ORDER BY date DESC, order_number DESC').all() as any[];
+    return rows.map((row) => ({
+      ...row,
+      id: row.id,
+      orderNumber: row.order_number,
+      customer: row.customer,
+      customerContact: row.customer_contact,
+      serial: row.serial,
+      device: row.device,
+      issue: row.issue,
+      status: row.status,
+      priority: row.priority,
+      value: Number(row.value),
+      date: row.date,
+      deadline: row.deadline,
+      exitDate: row.exit_date,
+    })) as ServiceOrder[];
+  }
+
+  async getServiceOrderById(id: string): Promise<ServiceOrder | undefined> {
+    const row = sqliteDb.prepare('SELECT * FROM service_orders WHERE id = ?').get(id) as any;
+    return row ? ({
+      ...row,
+      id: row.id,
+      orderNumber: row.order_number,
+      customer: row.customer,
+      customerContact: row.customer_contact,
+      serial: row.serial,
+      device: row.device,
+      issue: row.issue,
+      status: row.status,
+      priority: row.priority,
+      value: Number(row.value),
+      date: row.date,
+      deadline: row.deadline,
+      exitDate: row.exit_date,
+    }) as ServiceOrder : undefined;
+  }
+
+  async createServiceOrder(insertOrder: InsertServiceOrder): Promise<ServiceOrder> {
+    const id = randomUUID();
+    const order: ServiceOrder = {
+      ...insertOrder,
+      id,
+      serial: insertOrder.serial ?? null,
+      exitDate: insertOrder.exitDate ?? null,
+    } as ServiceOrder;
+
+    sqliteDb.prepare(
+      'INSERT INTO service_orders (id, order_number, customer, customer_contact, serial, device, issue, status, priority, value, date, deadline, exit_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(
+      order.id,
+      order.orderNumber,
+      order.customer,
+      order.customerContact,
+      order.serial ?? null,
+      order.device,
+      order.issue,
+      order.status,
+      order.priority,
+      order.value.toString(),
+      order.date,
+      order.deadline,
+      order.exitDate ?? null,
+    );
+
+    return order;
+  }
+
+  async updateServiceOrder(id: string, update: Partial<InsertServiceOrder>): Promise<ServiceOrder | undefined> {
+    const existing = await this.getServiceOrderById(id);
+    if (!existing) return undefined;
+
+    const next = {
+      ...existing,
+      ...update,
+      serial: update.serial ?? existing.serial ?? null,
+      value: Number(update.value ?? existing.value),
+      exitDate: update.exitDate ?? existing.exitDate ?? null,
+    } as ServiceOrder;
+
+    sqliteDb.prepare(
+      'UPDATE service_orders SET order_number = ?, customer = ?, customer_contact = ?, serial = ?, device = ?, issue = ?, status = ?, priority = ?, value = ?, date = ?, deadline = ?, exit_date = ? WHERE id = ?'
+    ).run(
+      next.orderNumber,
+      next.customer,
+      next.customerContact,
+      next.serial ?? null,
+      next.device,
+      next.issue,
+      next.status,
+      next.priority,
+      next.value.toString(),
+      next.date,
+      next.deadline,
+      next.exitDate ?? null,
+      id,
+    );
+
+    return next;
   }
 }

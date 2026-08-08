@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -30,8 +31,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/sales";
 
-const initialServiceOrders: any[] = [];
+interface ServiceOrderRecord {
+  id: string;
+  orderNumber: string;
+  customer: string;
+  customerContact: string;
+  serial?: string | null;
+  device: string;
+  issue: string;
+  status: string;
+  priority: string;
+  value: number;
+  date: string;
+  deadline: string;
+  exitDate?: string | null;
+}
 
 const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   "Orçamento": "outline",
@@ -47,17 +64,22 @@ const priorityColors: Record<string, "default" | "secondary" | "destructive"> = 
   "Alta": "destructive",
 };
 
+const formatDate = (value: string) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("pt-BR");
+};
+
 export default function ServiceOrders() {
   const { toast } = useToast();
-  const [orders, setOrders] = useState(initialServiceOrders);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<typeof initialServiceOrders[0] | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<ServiceOrderRecord | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
-  // Form states
   const [customer, setCustomer] = useState("");
   const [customerContact, setCustomerContact] = useState("");
   const [device, setDevice] = useState("");
@@ -68,11 +90,9 @@ export default function ServiceOrders() {
   const [value, setValue] = useState("");
   const [status, setStatus] = useState("Orçamento");
 
-  // Print states
   const [selectedPrinter, setSelectedPrinter] = useState("default");
   const [printCopies, setPrintCopies] = useState("1");
 
-  // Mock de impressoras disponíveis
   const availablePrinters = [
     { id: "default", name: "Impressora Padrão do Sistema" },
     { id: "thermal", name: "Impressora Térmica 80mm" },
@@ -80,26 +100,89 @@ export default function ServiceOrders() {
     { id: "pdf", name: "Salvar como PDF" },
   ];
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.device.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.issue.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter ? order.status === statusFilter : true;
-    
-    return matchesSearch && matchesStatus;
+  const { data: orders = [], isLoading } = useQuery<ServiceOrderRecord[]>({
+    queryKey: ["/api/service-orders"],
   });
 
-  const handleViewDetails = (order: typeof initialServiceOrders[0]) => {
+  const createOrderMutation = useMutation({
+    mutationFn: async (payload: Omit<ServiceOrderRecord, "id">) => {
+      const response = await apiRequest("POST", "/api/service-orders", payload);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-orders"] });
+      toast({
+        title: "Ordem de Serviço criada!",
+        description: "A ordem foi salva com sucesso.",
+      });
+      setCustomer("");
+      setCustomerContact("");
+      setDevice("");
+      setSerial("");
+      setIssue("");
+      setPriority("Média");
+      setDeadline("");
+      setValue("");
+      setStatus("Orçamento");
+      setShowNewDialog(false);
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao criar ordem",
+        description: "Não foi possível salvar a ordem de serviço.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateOrderMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: Partial<ServiceOrderRecord> }) => {
+      const response = await apiRequest("PUT", `/api/service-orders/${id}`, payload);
+      return response.json();
+    },
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/service-orders"] });
+      if (selectedOrder?.id === variables.id) {
+        setSelectedOrder((current) => current ? { ...current, ...variables.payload } : current);
+      }
+      toast({
+        title: "Ordem atualizada",
+        description: "A alteração foi salva com sucesso.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao atualizar ordem",
+        description: "Não foi possível salvar a alteração.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const search = searchTerm.toLowerCase();
+      const matchesSearch =
+        order.orderNumber.toLowerCase().includes(search) ||
+        order.customer.toLowerCase().includes(search) ||
+        order.device.toLowerCase().includes(search) ||
+        order.issue.toLowerCase().includes(search) ||
+        (order.serial ?? "").toLowerCase().includes(search);
+
+      const matchesStatus = statusFilter ? order.status === statusFilter : true;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [orders, searchTerm, statusFilter]);
+
+  const totalRevenue = useMemo(() => orders.reduce((sum, order) => sum + Number(order.value || 0), 0), [orders]);
+
+  const handleViewDetails = (order: ServiceOrderRecord) => {
     setSelectedOrder(order);
     setShowDetailsDialog(true);
   };
 
   const handleNewOrder = () => {
-    console.log("Creating new service order");
-    
     if (!customer || !device || !issue) {
       toast({
         title: "Campos obrigatórios faltando",
@@ -109,74 +192,54 @@ export default function ServiceOrders() {
       return;
     }
 
-    const today = new Date().toLocaleDateString('pt-BR');
-    const newId = `OS${String(orders.length + 1).padStart(4, '0')}`;
-    
-    const newOrder = {
-      id: newId,
+    const today = new Date().toISOString().slice(0, 10);
+    const newId = `OS${String(orders.length + 1).padStart(4, "0")}`;
+    const finalDeadline = deadline || today;
+
+    createOrderMutation.mutate({
+      orderNumber: newId,
       customer,
       customerContact,
-      device,
       serial,
+      device,
       issue,
       priority,
       status,
       date: today,
-      deadline: deadline ? new Date(deadline).toLocaleDateString('pt-BR') : today,
-      value: parseFloat(value) || 0,
+      deadline: finalDeadline,
+      value: Number(value || 0),
       exitDate: status === "Concluída" ? today : null,
-    };
-
-    setOrders(prevOrders => [...prevOrders, newOrder]);
-    
-    toast({
-      title: "Ordem de Serviço criada!",
-      description: `${newId} - ${customer} cadastrado com sucesso`,
     });
-    
-    // Limpar formulário
-    setCustomer("");
-    setCustomerContact("");
-    setDevice("");
-    setSerial("");
-    setIssue("");
-    setPriority("Média");
-    setDeadline("");
-    setValue("");
-    setStatus("Orçamento");
-    setShowNewDialog(false);
   };
 
   const handleCompleteOrder = (orderId: string) => {
-    const today = new Date().toLocaleDateString('pt-BR');
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: "Concluída", exitDate: today }
-          : order
-      )
-    );
-    setShowDetailsDialog(false);
+    const today = new Date().toISOString().slice(0, 10);
+    updateOrderMutation.mutate({
+      id: orderId,
+      payload: {
+        status: "Concluída",
+        exitDate: today,
+      },
+    });
   };
 
-  const handleShareWhatsApp = (order: typeof initialServiceOrders[0]) => {
+  const handleShareWhatsApp = (order: ServiceOrderRecord) => {
     const message = `*BRINKCELL - Ordem de Serviço*%0A%0A` +
-      `*OS:* ${order.id}%0A` +
+      `*OS:* ${order.orderNumber}%0A` +
       `*Cliente:* ${order.customer}%0A` +
       `*Aparelho:* ${order.device}%0A` +
       `*Defeito:* ${order.issue}%0A` +
       `*Status:* ${order.status}%0A` +
       `*Prioridade:* ${order.priority}%0A` +
-      `*Valor:* R$ ${order.value.toFixed(2)}%0A` +
-      `*Data:* ${order.date}%0A` +
-      `*Prazo:* ${order.deadline}` +
-      (order.exitDate ? `%0A*Data de Saída:* ${order.exitDate}` : '');
-    
-    const whatsappUrl = `https://wa.me/?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+      `*Valor:* ${formatCurrency(order.value)}%0A` +
+      `*Data:* ${formatDate(order.date)}%0A` +
+      `*Prazo:* ${formatDate(order.deadline)}` +
+      (order.exitDate ? `%0A*Data de Saída:* ${formatDate(order.exitDate)}` : "");
+
+    window.open(`https://wa.me/?text=${message}`, "_blank");
   };
 
-  const handleOpenPrintDialog = (order: typeof initialServiceOrders[0]) => {
+  const handleOpenPrintDialog = (order: ServiceOrderRecord) => {
     setSelectedOrder(order);
     setShowPrintDialog(true);
   };
@@ -184,19 +247,18 @@ export default function ServiceOrders() {
   const handlePrint = () => {
     if (!selectedOrder) return;
 
-    const printer = availablePrinters.find(p => p.id === selectedPrinter);
-    
+    const printer = availablePrinters.find((p) => p.id === selectedPrinter);
     toast({
       title: "Imprimindo OS",
-      description: `${selectedOrder.id} será impresso em: ${printer?.name}`,
+      description: `${selectedOrder.orderNumber} será impresso em: ${printer?.name} (${printCopies} cópia(s))`,
     });
 
-    // Criar conteúdo de impressão
     const printContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Ordem de Serviço - ${selectedOrder.id}</title>
+        <meta charset="UTF-8" />
+        <title>Ordem de Serviço - ${selectedOrder.orderNumber}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; }
           .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -210,29 +272,29 @@ export default function ServiceOrders() {
         <div class="header">
           <h1>BRINKCELL</h1>
           <h2>ORDEM DE SERVIÇO</h2>
-          <h3>${selectedOrder.id}</h3>
+          <h3>${selectedOrder.orderNumber}</h3>
         </div>
-        
+
         <div class="section">
           <div class="info"><span class="label">Cliente:</span> ${selectedOrder.customer}</div>
-          <div class="info"><span class="label">Contato:</span> ${selectedOrder.customerContact || '-'}</div>
-          <div class="info"><span class="label">Data:</span> ${selectedOrder.date}</div>
-          <div class="info"><span class="label">Prazo:</span> ${selectedOrder.deadline}</div>
+          <div class="info"><span class="label">Contato:</span> ${selectedOrder.customerContact || "-"}</div>
+          <div class="info"><span class="label">Data:</span> ${formatDate(selectedOrder.date)}</div>
+          <div class="info"><span class="label">Prazo:</span> ${formatDate(selectedOrder.deadline)}</div>
         </div>
-        
+
         <div class="section">
           <div class="info"><span class="label">Aparelho:</span> ${selectedOrder.device}</div>
-          <div class="info"><span class="label">Série:</span> ${selectedOrder.serial || '-'}</div>
+          <div class="info"><span class="label">Série:</span> ${selectedOrder.serial || "-"}</div>
           <div class="info"><span class="label">Defeito:</span> ${selectedOrder.issue}</div>
         </div>
-        
+
         <div class="section">
           <div class="info"><span class="label">Status:</span> ${selectedOrder.status}</div>
           <div class="info"><span class="label">Prioridade:</span> ${selectedOrder.priority}</div>
-          <div class="info"><span class="label">Valor:</span> R$ ${selectedOrder.value.toFixed(2)}</div>
-          ${selectedOrder.exitDate ? `<div class="info"><span class="label">Data de Saída:</span> ${selectedOrder.exitDate}</div>` : ''}
+          <div class="info"><span class="label">Valor:</span> ${formatCurrency(selectedOrder.value)}</div>
+          ${selectedOrder.exitDate ? `<div class="info"><span class="label">Data de Saída:</span> ${formatDate(selectedOrder.exitDate)}</div>` : ""}
         </div>
-        
+
         <div class="footer">
           <p>_________________________________</p>
           <p>Assinatura do Cliente</p>
@@ -241,18 +303,14 @@ export default function ServiceOrders() {
       </html>
     `;
 
-    // Abrir janela de impressão
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.document.write(printContent);
       printWindow.document.close();
       printWindow.focus();
-      
       setTimeout(() => {
         printWindow.print();
-        if (selectedPrinter === 'pdf') {
-          // Modo PDF não fecha automaticamente
-        } else {
+        if (selectedPrinter !== "pdf") {
           setTimeout(() => printWindow.close(), 500);
         }
       }, 250);
@@ -266,9 +324,7 @@ export default function ServiceOrders() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold" data-testid="text-page-title">Ordens de Serviço</h1>
-          <p className="text-muted-foreground">
-            Gerenciar consertos e manutenções
-          </p>
+          <p className="text-muted-foreground">Gerenciar consertos e manutenções</p>
         </div>
         <Button onClick={() => setShowNewDialog(true)} data-testid="button-new-service-order">
           <Plus className="h-4 w-4 mr-2" />
@@ -277,11 +333,7 @@ export default function ServiceOrders() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card 
-          className="cursor-pointer hover-elevate" 
-          onClick={() => setStatusFilter(null)}
-          data-testid="card-total-orders"
-        >
+        <Card className="cursor-pointer hover-elevate" onClick={() => setStatusFilter(null)} data-testid="card-total-orders">
           <div className="p-4">
             <p className="text-sm text-muted-foreground uppercase tracking-wide font-medium mb-2">
               Total {statusFilter === null && "✓"}
@@ -289,31 +341,23 @@ export default function ServiceOrders() {
             <p className="text-2xl font-bold font-mono">{orders.length}</p>
           </div>
         </Card>
-        <Card 
-          className="cursor-pointer hover-elevate" 
-          onClick={() => setStatusFilter("Em andamento")}
-          data-testid="card-in-progress-orders"
-        >
+        <Card className="cursor-pointer hover-elevate" onClick={() => setStatusFilter("Em andamento")} data-testid="card-in-progress-orders">
           <div className="p-4">
             <p className="text-sm text-muted-foreground uppercase tracking-wide font-medium mb-2">
               Em Andamento {statusFilter === "Em andamento" && "✓"}
             </p>
             <p className="text-2xl font-bold font-mono text-primary">
-              {orders.filter(o => o.status === "Em andamento").length}
+              {orders.filter((o) => o.status === "Em andamento").length}
             </p>
           </div>
         </Card>
-        <Card 
-          className="cursor-pointer hover-elevate" 
-          onClick={() => setStatusFilter("Concluída")}
-          data-testid="card-completed-orders"
-        >
+        <Card className="cursor-pointer hover-elevate" onClick={() => setStatusFilter("Concluída")} data-testid="card-completed-orders">
           <div className="p-4">
             <p className="text-sm text-muted-foreground uppercase tracking-wide font-medium mb-2">
               Concluídas {statusFilter === "Concluída" && "✓"}
             </p>
             <p className="text-2xl font-bold font-mono text-chart-2">
-              {orders.filter(o => o.status === "Concluída").length}
+              {orders.filter((o) => o.status === "Concluída").length}
             </p>
           </div>
         </Card>
@@ -323,7 +367,7 @@ export default function ServiceOrders() {
               Receita
             </p>
             <p className="text-2xl font-bold font-mono">
-              R$ {orders.reduce((sum, o) => sum + o.value, 0).toFixed(2)}
+              {formatCurrency(totalRevenue)}
             </p>
           </div>
         </Card>
@@ -345,108 +389,82 @@ export default function ServiceOrders() {
           </div>
 
           <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>OS</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Aparelho</TableHead>
-                  <TableHead>Defeito</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead>Prazo</TableHead>
-                  <TableHead>Saída</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id} data-testid={`row-service-order-${order.id}`}>
-                    <TableCell className="font-mono font-semibold">{order.id}</TableCell>
-                    <TableCell className="font-medium">{order.customer}</TableCell>
-                    <TableCell>{order.device}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{order.issue}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusColors[order.status]}>
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={priorityColors[order.priority]}>
-                        {order.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      R$ {order.value.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-sm">{order.deadline}</TableCell>
-                    <TableCell className="text-sm">
-                      {order.exitDate ? (
-                        <span className="text-green-600 dark:text-green-500 font-medium">{order.exitDate}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          onClick={() => handleViewDetails(order)}
-                          data-testid={`button-view-${order.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {order.status !== "Concluída" && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => handleCompleteOrder(order.id)}
-                            title="Baixar OS"
-                            data-testid={`button-complete-${order.id}`}
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          data-testid={`button-edit-${order.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          onClick={() => handleShareWhatsApp(order)}
-                          data-testid={`button-share-${order.id}`}
-                        >
-                          <Share2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          onClick={() => handleOpenPrintDialog(order)}
-                          title="Imprimir OS"
-                          data-testid={`button-print-${order.id}`}
-                        >
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            {isLoading ? (
+              <div className="p-8 text-center text-muted-foreground">Carregando ordens de serviço...</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>OS</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Aparelho</TableHead>
+                    <TableHead>Defeito</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Prioridade</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Prazo</TableHead>
+                    <TableHead>Saída</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order) => (
+                    <TableRow key={order.id} data-testid={`row-service-order-${order.id}`}>
+                      <TableCell className="font-mono font-semibold">{order.orderNumber}</TableCell>
+                      <TableCell className="font-medium">{order.customer}</TableCell>
+                      <TableCell>{order.device}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{order.issue}</TableCell>
+                      <TableCell>
+                        <Badge variant={statusColors[order.status] || "outline"}>{order.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={priorityColors[order.priority] || "default"}>{order.priority}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(order.value)}</TableCell>
+                      <TableCell className="text-sm">{formatDate(order.deadline)}</TableCell>
+                      <TableCell className="text-sm">
+                        {order.exitDate ? (
+                          <span className="text-green-600 dark:text-green-500 font-medium">{formatDate(order.exitDate)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleViewDetails(order)} data-testid={`button-view-${order.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {order.status !== "Concluída" && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => handleCompleteOrder(order.id)}
+                              title="Baixar OS"
+                              data-testid={`button-complete-${order.id}`}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="ghost" className="h-8 w-8" disabled data-testid={`button-edit-${order.id}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleShareWhatsApp(order)} data-testid={`button-share-${order.id}`}>
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleOpenPrintDialog(order)} title="Imprimir OS" data-testid={`button-print-${order.id}`}>
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
 
-          {filteredOrders.length === 0 && (
+          {!isLoading && filteredOrders.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Wrench className="h-12 w-12 text-muted-foreground/30 mb-4" />
               <p className="text-muted-foreground">Nenhuma ordem de serviço encontrada</p>
@@ -459,68 +477,33 @@ export default function ServiceOrders() {
         <DialogContent className="max-w-2xl" data-testid="dialog-new-service-order">
           <DialogHeader>
             <DialogTitle>Nova Ordem de Serviço</DialogTitle>
-            <DialogDescription>
-              Preencha os dados da ordem de serviço
-            </DialogDescription>
+            <DialogDescription>Preencha os dados da ordem de serviço</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div>
               <Label htmlFor="customer">Cliente *</Label>
-              <Input
-                id="customer"
-                placeholder="Nome do cliente"
-                value={customer}
-                onChange={(e) => setCustomer(e.target.value)}
-                data-testid="input-customer"
-              />
+              <Input id="customer" placeholder="Nome do cliente" value={customer} onChange={(e) => setCustomer(e.target.value)} data-testid="input-customer" />
             </div>
             <div>
               <Label htmlFor="customer-contact">Contato do Cliente</Label>
-              <Input
-                id="customer-contact"
-                placeholder="(11) 98765-4321"
-                value={customerContact}
-                onChange={(e) => setCustomerContact(e.target.value)}
-                data-testid="input-customer-contact"
-              />
+              <Input id="customer-contact" placeholder="(11) 98765-4321" value={customerContact} onChange={(e) => setCustomerContact(e.target.value)} data-testid="input-customer-contact" />
             </div>
             <div>
               <Label htmlFor="device">Aparelho *</Label>
-              <Input
-                id="device"
-                placeholder="Ex: Smartphone XYZ"
-                value={device}
-                onChange={(e) => setDevice(e.target.value)}
-                data-testid="input-device"
-              />
+              <Input id="device" placeholder="Ex: Smartphone XYZ" value={device} onChange={(e) => setDevice(e.target.value)} data-testid="input-device" />
             </div>
             <div>
               <Label htmlFor="serial">Número de Série</Label>
-              <Input
-                id="serial"
-                placeholder="Número de série"
-                value={serial}
-                onChange={(e) => setSerial(e.target.value)}
-                data-testid="input-serial"
-              />
+              <Input id="serial" placeholder="Número de série" value={serial} onChange={(e) => setSerial(e.target.value)} data-testid="input-serial" />
             </div>
             <div className="col-span-2">
               <Label htmlFor="issue">Defeito Relatado *</Label>
-              <Textarea
-                id="issue"
-                placeholder="Descreva o problema..."
-                rows={3}
-                value={issue}
-                onChange={(e) => setIssue(e.target.value)}
-                data-testid="input-issue"
-              />
+              <Textarea id="issue" placeholder="Descreva o problema..." rows={3} value={issue} onChange={(e) => setIssue(e.target.value)} data-testid="input-issue" />
             </div>
             <div>
               <Label htmlFor="priority">Prioridade</Label>
               <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger data-testid="select-priority">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-priority"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Baixa">Baixa</SelectItem>
                   <SelectItem value="Média">Média</SelectItem>
@@ -530,32 +513,16 @@ export default function ServiceOrders() {
             </div>
             <div>
               <Label htmlFor="deadline">Prazo</Label>
-              <Input
-                id="deadline"
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                data-testid="input-deadline"
-              />
+              <Input id="deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} data-testid="input-deadline" />
             </div>
             <div>
               <Label htmlFor="value">Valor Estimado</Label>
-              <Input
-                id="value"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                data-testid="input-value"
-              />
+              <Input id="value" type="number" step="0.01" placeholder="0.00" value={value} onChange={(e) => setValue(e.target.value)} data-testid="input-value" />
             </div>
             <div>
               <Label htmlFor="status">Status</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger data-testid="select-status">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-status"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Orçamento">Orçamento</SelectItem>
                   <SelectItem value="Em andamento">Em andamento</SelectItem>
@@ -566,10 +533,8 @@ export default function ServiceOrders() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleNewOrder} data-testid="button-save-service-order">
+            <Button variant="outline" onClick={() => setShowNewDialog(false)}>Cancelar</Button>
+            <Button onClick={handleNewOrder} disabled={createOrderMutation.isPending} data-testid="button-save-service-order">
               Salvar Ordem
             </Button>
           </DialogFooter>
@@ -580,22 +545,18 @@ export default function ServiceOrders() {
         <DialogContent className="max-w-2xl" data-testid="dialog-service-order-details">
           <DialogHeader>
             <DialogTitle>Detalhes da Ordem de Serviço</DialogTitle>
-            <DialogDescription>
-              Informações completas da ordem de serviço
-            </DialogDescription>
+            <DialogDescription>Informações completas da ordem de serviço</DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Número da OS</p>
-                  <p className="font-mono font-bold text-lg">{selectedOrder.id}</p>
+                  <p className="font-mono font-bold text-lg">{selectedOrder.orderNumber}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Status</p>
-                  <Badge variant={statusColors[selectedOrder.status]}>
-                    {selectedOrder.status}
-                  </Badge>
+                  <Badge variant={statusColors[selectedOrder.status] || "outline"}>{selectedOrder.status}</Badge>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -605,20 +566,22 @@ export default function ServiceOrders() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Contato</p>
-                  <p className="font-medium">{selectedOrder.customerContact}</p>
+                  <p className="font-medium">{selectedOrder.customerContact || "-"}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Prioridade</p>
-                  <Badge variant={priorityColors[selectedOrder.priority]}>
-                    {selectedOrder.priority}
-                  </Badge>
+                  <Badge variant={priorityColors[selectedOrder.priority] || "default"}>{selectedOrder.priority}</Badge>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Aparelho</p>
                 <p className="font-medium">{selectedOrder.device}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Número de Série</p>
+                <p className="font-medium">{selectedOrder.serial || "-"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Defeito Relatado</p>
@@ -627,54 +590,40 @@ export default function ServiceOrders() {
               <div className="grid grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Data de Entrada</p>
-                  <p className="font-medium">{selectedOrder.date}</p>
+                  <p className="font-medium">{formatDate(selectedOrder.date)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Prazo</p>
-                  <p className="font-medium">{selectedOrder.deadline}</p>
+                  <p className="font-medium">{formatDate(selectedOrder.deadline)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Data de Saída</p>
                   {selectedOrder.exitDate ? (
-                    <p className="font-medium text-green-600 dark:text-green-500">{selectedOrder.exitDate}</p>
+                    <p className="font-medium text-green-600 dark:text-green-500">{formatDate(selectedOrder.exitDate)}</p>
                   ) : (
                     <p className="text-muted-foreground">—</p>
                   )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Valor</p>
-                  <p className="font-bold font-mono text-primary">
-                    R$ {selectedOrder.value.toFixed(2)}
-                  </p>
+                  <p className="font-bold font-mono text-primary">{formatCurrency(selectedOrder.value)}</p>
                 </div>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
-              Fechar
-            </Button>
+            <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>Fechar</Button>
             {selectedOrder && selectedOrder.status !== "Concluída" && (
-              <Button 
-                onClick={() => handleCompleteOrder(selectedOrder.id)}
-                data-testid="button-complete-order"
-              >
+              <Button onClick={() => handleCompleteOrder(selectedOrder.id)} data-testid="button-complete-order">
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Baixar OS
               </Button>
             )}
-            <Button 
-              variant="outline"
-              onClick={() => selectedOrder && handleShareWhatsApp(selectedOrder)}
-              data-testid="button-share-whatsapp"
-            >
+            <Button variant="outline" onClick={() => selectedOrder && handleShareWhatsApp(selectedOrder)} data-testid="button-share-whatsapp">
               <Share2 className="h-4 w-4 mr-2" />
               Compartilhar WhatsApp
             </Button>
-            <Button 
-              onClick={() => selectedOrder && handleOpenPrintDialog(selectedOrder)}
-              data-testid="button-print-details"
-            >
+            <Button onClick={() => selectedOrder && handleOpenPrintDialog(selectedOrder)} data-testid="button-print-details">
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
@@ -682,29 +631,24 @@ export default function ServiceOrders() {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de Impressão */}
       <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
         <DialogContent data-testid="dialog-print">
           <DialogHeader>
             <DialogTitle>Imprimir Ordem de Serviço</DialogTitle>
-            <DialogDescription>
-              Selecione a impressora e o número de cópias
-            </DialogDescription>
+            <DialogDescription>Selecione a impressora e o número de cópias</DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-4 py-4">
               <div className="p-4 bg-muted rounded-md">
                 <p className="text-sm text-muted-foreground mb-1">Ordem de Serviço</p>
-                <p className="font-mono font-bold text-lg">{selectedOrder.id}</p>
+                <p className="font-mono font-bold text-lg">{selectedOrder.orderNumber}</p>
                 <p className="text-sm mt-1">{selectedOrder.customer} - {selectedOrder.device}</p>
               </div>
 
               <div>
                 <Label htmlFor="printer-select">Selecionar Impressora</Label>
                 <Select value={selectedPrinter} onValueChange={setSelectedPrinter}>
-                  <SelectTrigger id="printer-select" data-testid="select-printer">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger id="printer-select" data-testid="select-printer"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {availablePrinters.map((printer) => (
                       <SelectItem key={printer.id} value={printer.id}>
@@ -730,15 +674,13 @@ export default function ServiceOrders() {
 
               <div className="p-3 border rounded-md bg-blue-50 dark:bg-blue-950">
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Impressora selecionada:</strong> {availablePrinters.find(p => p.id === selectedPrinter)?.name}
+                  <strong>Impressora selecionada:</strong> {availablePrinters.find((p) => p.id === selectedPrinter)?.name}
                 </p>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPrintDialog(false)}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setShowPrintDialog(false)}>Cancelar</Button>
             <Button onClick={handlePrint} data-testid="button-confirm-print">
               <Printer className="h-4 w-4 mr-2" />
               Imprimir

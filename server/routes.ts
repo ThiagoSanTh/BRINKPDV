@@ -75,12 +75,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/sales/:id", async (req, res) => {
+    try {
+      const sale = await storage.getSaleById(req.params.id);
+      if (!sale) {
+        return res.status(404).json({ error: "Sale not found" });
+      }
+
+      const salespersonName = sale.salespersonId
+        ? (await storage.getSalespersonById(sale.salespersonId))?.name
+        : undefined;
+
+      res.json({
+        ...sale,
+        salespersonName,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sale" });
+    }
+  });
+
   app.post("/api/sales", async (req, res) => {
     try {
       const sale = await storage.createSale(req.body);
       res.status(201).json(sale);
     } catch (error) {
       res.status(500).json({ error: "Failed to create sale" });
+    }
+  });
+
+  app.get("/api/service-orders", async (_req, res) => {
+    try {
+      const orders = await storage.getServiceOrders();
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch service orders" });
+    }
+  });
+
+  app.get("/api/service-orders/:id", async (req, res) => {
+    try {
+      const order = await storage.getServiceOrderById(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Service order not found" });
+      }
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch service order" });
+    }
+  });
+
+  app.post("/api/service-orders", async (req, res) => {
+    try {
+      const order = await storage.createServiceOrder(req.body);
+      res.status(201).json(order);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create service order" });
+    }
+  });
+
+  app.put("/api/service-orders/:id", async (req, res) => {
+    try {
+      const order = await storage.updateServiceOrder(req.params.id, req.body);
+      if (!order) {
+        return res.status(404).json({ error: "Service order not found" });
+      }
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update service order" });
     }
   });
 

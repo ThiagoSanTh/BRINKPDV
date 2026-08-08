@@ -3,14 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  DollarSign, 
-  ShoppingCart, 
-  CreditCard, 
-  Smartphone, 
+import {
+  DollarSign,
+  ShoppingCart,
+  CreditCard,
+  Smartphone,
   Wallet,
   Calendar,
   TrendingUp,
+  Printer,
   X
 } from "lucide-react";
 import {
@@ -21,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { buildSaleReceiptHtml } from "@/lib/receipt";
 import type { Sale } from "@shared/schema";
 
 interface SaleWithDetails extends Sale {
@@ -92,6 +94,22 @@ export default function DailySales() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleReprint = async (saleId: string) => {
+    try {
+      const res = await fetch(`/api/sales/${saleId}`);
+      if (!res.ok) throw new Error("Venda não encontrada");
+      const sale = await res.json();
+      const html = buildSaleReceiptHtml({ sale });
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+      }
+    } catch {
+      // falha silenciosa — venda pode não estar disponível
+    }
   };
 
   if (isLoading) {
@@ -275,6 +293,7 @@ export default function DailySales() {
                     <TableHead>Vendedor</TableHead>
                     <TableHead>Pagamento</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -293,6 +312,18 @@ export default function DailySales() {
                       </TableCell>
                       <TableCell className="text-right font-mono font-semibold text-primary">
                         {formatCurrency(Number(sale.total))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => handleReprint(sale.id)}
+                          data-testid={`button-reprint-${sale.id}`}
+                          title="Reimprimir comprovante"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

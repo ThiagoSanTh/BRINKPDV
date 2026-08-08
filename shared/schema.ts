@@ -16,6 +16,7 @@ export const products = pgTable("products", {
   category: text("category").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(), //colocaria como float e trataria no front como decimal
   stock: integer("stock").notNull().default(0),
+  barcode: text("barcode"),
   image: text("image"),
 });
 
@@ -35,7 +36,7 @@ export const sales = pgTable("sales", {
   salespersonId: varchar("salesperson_id").references(() => salespersons.id),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   paymentMethod: text("payment_method").notNull(),// poderia ser enum 
-  items: text("items").notNull(),
+  items: text("items").notNull(), // Fk de products, poderia ser um array de objetos com id do produto e quantidade
   observation: text("observation"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });

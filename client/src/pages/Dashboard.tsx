@@ -28,6 +28,19 @@ type SaleRecord = {
   items?: Array<{ name: string; quantity: number; price: number }>;
 };
 
+type ProductRecord = {
+  id: string;
+  name: string;
+  stock: number;
+};
+
+type ServiceOrderRecord = {
+  id: string;
+  orderNumber: string;
+  value: string | number;
+  status: string;
+};
+
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -41,6 +54,8 @@ export default function Dashboard() {
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalDescription, setWithdrawalDescription] = useState("");
   const { data: sales = [] } = useQuery<SaleRecord[]>({ queryKey: ["/api/sales/today"] });
+  const { data: products = [] } = useQuery<ProductRecord[]>({ queryKey: ["/api/products"] });
+  const { data: serviceOrders = [] } = useQuery<ServiceOrderRecord[]>({ queryKey: ["/api/service-orders"] });
 
   const handleCashEntry = () => {
     const amount = parseFloat(entryAmount);
@@ -89,6 +104,18 @@ export default function Dashboard() {
   const cashBalance = cashIn - cashOut;
   const todaySales = useMemo(() => sales as SaleRecord[], [sales]);
   const totalSalesValue = useMemo(() => todaySales.reduce((sum, sale) => sum + Number(sale.total), 0), [todaySales]);
+  const salesCount = todaySales.length;
+  const totalProducts = products.length;
+  const lowStockCount = useMemo(() => products.filter((product) => Number(product.stock) < 10).length, [products]);
+  const serviceOrderCount = serviceOrders.length;
+  const serviceOrderRevenue = useMemo(
+    () => serviceOrders.reduce((sum, order) => sum + Number(order.value), 0),
+    [serviceOrders],
+  );
+  const openServiceOrders = useMemo(
+    () => serviceOrders.filter((order) => order.status !== "Concluída").length,
+    [serviceOrders],
+  );
   const salesByPayment = useMemo(() => {
     return todaySales.reduce((acc, sale) => {
       acc[sale.paymentMethod] = (acc[sale.paymentMethod] || 0) + Number(sale.total);
@@ -130,21 +157,21 @@ export default function Dashboard() {
         <div onClick={() => setLocation("/pos")} className="cursor-pointer" data-testid="clickable-card-transactions">
           <StatsCard
             title="Transações"
-            value="0"
+            value={String(salesCount)}
             icon={ShoppingCart}
           />
         </div>
         <div onClick={() => setLocation("/products")} className="cursor-pointer" data-testid="clickable-card-products">
           <StatsCard
             title="Produtos"
-            value="0"
+            value={String(totalProducts)}
             icon={Package}
           />
         </div>
         <div onClick={() => setLocation("/products")} className="cursor-pointer" data-testid="clickable-card-low-stock">
           <StatsCard
             title="Estoque Baixo"
-            value="0"
+            value={String(lowStockCount)}
             icon={AlertTriangle}
           />
         </div>

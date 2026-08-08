@@ -6,6 +6,8 @@ import {
   type Salesperson,
   type Product,
   type InsertProduct,
+  type ServiceOrder,
+  type InsertServiceOrder,
 } from "@shared/schema";
 import { db, isDatabaseConfigured } from "./db";
 import { SqliteStorage } from "./storage-sqlite";
@@ -28,6 +30,11 @@ export interface IStorage {
   createSale(sale: InsertSale): Promise<Sale>;
 
   getSalespersonById(id: string): Promise<Salesperson | undefined>;
+
+  getServiceOrders(): Promise<ServiceOrder[]>;
+  getServiceOrderById(id: string): Promise<ServiceOrder | undefined>;
+  createServiceOrder(order: InsertServiceOrder): Promise<ServiceOrder>;
+  updateServiceOrder(id: string, order: Partial<InsertServiceOrder>): Promise<ServiceOrder | undefined>;
 }
 
 export class HybridStorage implements IStorage {
@@ -182,6 +189,52 @@ export class HybridStorage implements IStorage {
       () => this.postgresStorage.getSalespersonById(id),
       () => this.sqliteStorage.getSalespersonById(id),
     );
+  }
+
+  async getServiceOrders(): Promise<ServiceOrder[]> {
+    return this.readWithFallback(
+      () => this.postgresStorage.getServiceOrders(),
+      () => this.sqliteStorage.getServiceOrders(),
+    );
+  }
+
+  async getServiceOrderById(id: string): Promise<ServiceOrder | undefined> {
+    return this.readWithFallback(
+      () => this.postgresStorage.getServiceOrderById(id),
+      () => this.sqliteStorage.getServiceOrderById(id),
+    );
+  }
+
+  async createServiceOrder(order: InsertServiceOrder): Promise<ServiceOrder> {
+    const localOrder = await this.sqliteStorage.createServiceOrder(order);
+
+    if (!isDatabaseConfigured()) {
+      return localOrder;
+    }
+
+    try {
+      await this.postgresStorage.createServiceOrder(localOrder as any);
+    } catch (error) {
+      console.warn("[STORAGE] Não foi possível sincronizar a ordem de serviço com o Postgres/Supabase.", error);
+    }
+
+    return localOrder;
+  }
+
+  async updateServiceOrder(id: string, order: Partial<InsertServiceOrder>): Promise<ServiceOrder | undefined> {
+    const localOrder = await this.sqliteStorage.updateServiceOrder(id, order);
+
+    if (!isDatabaseConfigured()) {
+      return localOrder;
+    }
+
+    try {
+      await this.postgresStorage.updateServiceOrder(id, order);
+    } catch (error) {
+      console.warn("[STORAGE] Não foi possível sincronizar atualização da ordem de serviço.", error);
+    }
+
+    return localOrder;
   }
 }
 

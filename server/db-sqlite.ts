@@ -28,6 +28,7 @@ sqliteDb.exec(`
     category TEXT NOT NULL,
     price TEXT NOT NULL,
     stock TEXT NOT NULL DEFAULT '0',
+    barcode TEXT,
     image TEXT
   );
 
@@ -52,6 +53,22 @@ sqliteDb.exec(`
     created_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS service_orders (
+    id TEXT PRIMARY KEY,
+    order_number TEXT NOT NULL UNIQUE,
+    customer TEXT NOT NULL,
+    customer_contact TEXT NOT NULL,
+    serial TEXT,
+    device TEXT NOT NULL,
+    issue TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Orçamento',
+    priority TEXT NOT NULL DEFAULT 'Média',
+    value TEXT NOT NULL,
+    date TEXT NOT NULL,
+    deadline TEXT NOT NULL,
+    exit_date TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS sync_queue (
     id TEXT PRIMARY KEY,
     entity TEXT NOT NULL,
@@ -60,6 +77,17 @@ sqliteDb.exec(`
     synced INTEGER NOT NULL DEFAULT 0
   );
 `);
+
+// Migração: adiciona coluna barcode se não existir (para bancos criados antes da feature)
+try {
+  const hasBarcode = sqliteDb.prepare("PRAGMA table_info(products)").all() as any[];
+  if (!hasBarcode.some((col: any) => col.name === "barcode")) {
+    sqliteDb.exec("ALTER TABLE products ADD COLUMN barcode TEXT");
+    console.log("[DB] Migração: coluna barcode adicionada à tabela products");
+  }
+} catch {
+  // coluna já existe, ignorar
+}
 
 sqliteDb.prepare(`
   INSERT OR IGNORE INTO salespersons (id, name, email, phone, commission, total_sales, active, entry_date)

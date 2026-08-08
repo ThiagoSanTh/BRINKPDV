@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { SalesChart } from "@/components/SalesChart";
+import { formatCurrency } from "@/lib/sales";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,6 +130,8 @@ export default function Reports() {
             id: item.name,
             name: item.name,
             total: 0,
+            qty: 0,
+            revenue: 0,
             credit: 0,
             debit: 0,
             pix: 0,
@@ -136,7 +139,10 @@ export default function Reports() {
           };
         }
         const amount = Number(item.quantity || 0) * Number(item.price || 0);
+        const itemDiscount = Number(item.discount || 0);
         grouped[item.name].total += amount;
+        grouped[item.name].qty += Number(item.quantity || 0);
+        grouped[item.name].revenue += Math.max(0, amount - itemDiscount);
         if (sale.paymentMethod === "Crédito") grouped[item.name].credit += amount;
         if (sale.paymentMethod === "Débito") grouped[item.name].debit += amount;
         if (sale.paymentMethod === "PIX") grouped[item.name].pix += amount;
@@ -383,32 +389,41 @@ export default function Reports() {
         <Card data-testid="card-summary">
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Resumo do Período</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between py-3 border-b">
-                <span className="text-muted-foreground">Total de Vendas</span>
-                <span className="font-bold font-mono text-xl text-primary">
-                  R$ 0,00
-                </span>
-              </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="text-muted-foreground">Total de Transações</span>
-                <span className="font-bold font-mono text-xl">
-                  0
-                </span>
-              </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="text-muted-foreground">Ticket Médio</span>
-                <span className="font-bold font-mono text-xl">
-                  R$ 0,00
-                </span>
-              </div>
-              <div className="flex justify-between py-3">
-                <span className="text-muted-foreground">Produtos Vendidos</span>
-                <span className="font-bold font-mono text-xl">
-                  0
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const summaryTotal = filteredSales.reduce((sum, s) => sum + Number(s.total), 0);
+              const summaryTransactions = filteredSales.length;
+              const summaryTicket = summaryTransactions > 0 ? summaryTotal / summaryTransactions : 0;
+              const summaryProductsQty = periodProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+
+              return (
+                <div className="space-y-4">
+                  <div className="flex justify-between py-3 border-b">
+                    <span className="text-muted-foreground">Total de Vendas</span>
+                    <span className="font-bold font-mono text-xl text-primary">
+                      R$ {summaryTotal.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-3 border-b">
+                    <span className="text-muted-foreground">Total de Transações</span>
+                    <span className="font-bold font-mono text-xl">
+                      {summaryTransactions}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-3 border-b">
+                    <span className="text-muted-foreground">Ticket Médio</span>
+                    <span className="font-bold font-mono text-xl">
+                      R$ {summaryTicket.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-3">
+                    <span className="text-muted-foreground">Produtos Vendidos</span>
+                    <span className="font-bold font-mono text-xl">
+                      {summaryProductsQty}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </Card>
       </div>
@@ -416,64 +431,92 @@ export default function Reports() {
       <Card data-testid="card-monthly-closure">
         <div className="p-6">
           <h3 className="text-lg font-semibold mb-4">Fechamento Mensal - {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CreditCard className="h-4 w-4 text-chart-1" />
-                  <p className="text-sm text-muted-foreground font-medium">Crédito</p>
+          {(() => {
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+            const monthSales = sales.filter((sale) => {
+              const d = new Date(sale.createdAt);
+              return d >= monthStart && d <= monthEnd;
+            });
+
+            const monthlyByPayment = monthSales.reduce((acc, sale) => {
+              acc[sale.paymentMethod] = (acc[sale.paymentMethod] || 0) + Number(sale.total);
+              return acc;
+            }, {} as Record<string, number>);
+
+            const monthlyTotal = monthSales.reduce((sum, s) => sum + Number(s.total), 0);
+            const creditTotal = monthlyByPayment["Crédito"] || 0;
+            const debitTotal = monthlyByPayment["Débito"] || 0;
+            const pixTotal = monthlyByPayment["PIX"] || 0;
+            const cashTotal = monthlyByPayment["Dinheiro"] || 0;
+
+            const formatBRL = (v: number) => `R$ ${v.toFixed(2)}`;
+            const pct = (v: number) => monthlyTotal > 0 ? ((v / monthlyTotal) * 100).toFixed(1) : "0.0";
+
+            return (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <div className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CreditCard className="h-4 w-4 text-chart-1" />
+                        <p className="text-sm text-muted-foreground font-medium">Crédito</p>
+                      </div>
+                      <p className="text-2xl font-bold font-mono">{formatCurrency(creditTotal)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{pct(creditTotal)}% do total</p>
+                    </div>
+                  </Card>
+                  <Card>
+                    <div className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CreditCard className="h-4 w-4 text-chart-2" />
+                        <p className="text-sm text-muted-foreground font-medium">Débito</p>
+                      </div>
+                      <p className="text-2xl font-bold font-mono">{formatCurrency(debitTotal)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{pct(debitTotal)}% do total</p>
+                    </div>
+                  </Card>
+                  <Card>
+                    <div className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Smartphone className="h-4 w-4 text-chart-3" />
+                        <p className="text-sm text-muted-foreground font-medium">PIX</p>
+                      </div>
+                      <p className="text-2xl font-bold font-mono">{formatCurrency(pixTotal)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{pct(pixTotal)}% do total</p>
+                    </div>
+                  </Card>
+                  <Card>
+                    <div className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Banknote className="h-4 w-4 text-chart-4" />
+                        <p className="text-sm text-muted-foreground font-medium">Dinheiro</p>
+                      </div>
+                      <p className="text-2xl font-bold font-mono">{formatCurrency(cashTotal)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{pct(cashTotal)}% do total</p>
+                    </div>
+                  </Card>
                 </div>
-                <p className="text-2xl font-bold font-mono">R$ 0,00</p>
-                <p className="text-xs text-muted-foreground mt-1">0% do total</p>
-              </div>
-            </Card>
-            <Card>
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CreditCard className="h-4 w-4 text-chart-2" />
-                  <p className="text-sm text-muted-foreground font-medium">Débito</p>
+                <div className="mt-6 pt-6 border-t">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold">Total do Mês:</span>
+                      <span className="text-3xl font-bold font-mono text-primary" data-testid="text-monthly-total">{formatCurrency(monthlyTotal)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-4 border-t">
+                      <span className="text-base font-medium text-muted-foreground">Lucro Total:</span>
+                      <span className="text-2xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-total-profit">{formatCurrency(monthlyTotal)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-base font-medium text-muted-foreground">Margem de Lucro:</span>
+                      <span className="text-2xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-profit-margin">{monthlyTotal > 0 ? '100%' : '0%'}</span>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-2xl font-bold font-mono">R$ 0,00</p>
-                <p className="text-xs text-muted-foreground mt-1">0% do total</p>
-              </div>
-            </Card>
-            <Card>
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Smartphone className="h-4 w-4 text-chart-3" />
-                  <p className="text-sm text-muted-foreground font-medium">PIX</p>
-                </div>
-                <p className="text-2xl font-bold font-mono">R$ 0,00</p>
-                <p className="text-xs text-muted-foreground mt-1">0% do total</p>
-              </div>
-            </Card>
-            <Card>
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Banknote className="h-4 w-4 text-chart-4" />
-                  <p className="text-sm text-muted-foreground font-medium">Dinheiro</p>
-                </div>
-                <p className="text-2xl font-bold font-mono">R$ 0,00</p>
-                <p className="text-xs text-muted-foreground mt-1">0% do total</p>
-              </div>
-            </Card>
-          </div>
-          <div className="mt-6 pt-6 border-t">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold">Total do Mês:</span>
-                <span className="text-3xl font-bold font-mono text-primary" data-testid="text-monthly-total">R$ 0,00</span>
-              </div>
-              <div className="flex justify-between items-center pt-4 border-t">
-                <span className="text-base font-medium text-muted-foreground">Lucro Total:</span>
-                <span className="text-2xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-total-profit">R$ 0,00</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-base font-medium text-muted-foreground">Margem de Lucro:</span>
-                <span className="text-2xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-profit-margin">0%</span>
-              </div>
-            </div>
-          </div>
+              </>
+            );
+          })()}
         </div>
       </Card>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { buildSaleReceiptHtml } from "@/lib/receipt";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -79,6 +80,21 @@ export default function POS() {
 
   const categories = useMemo(() => ["all", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
 
+  const normalizedBarcodeSearch = barcodeSearch.trim().toLowerCase();
+
+  const findBarcodeMatches = (code: string) => {
+    const normalizedCode = code.trim().toLowerCase();
+
+    if (!normalizedCode) {
+      return [] as ProductRecord[];
+    }
+
+    return products.filter((product) => {
+      const values = [product.sku, product.id, product.barcode].filter(Boolean).map((value) => String(value).toLowerCase());
+      return values.some((value) => value === normalizedCode || value.includes(normalizedCode));
+    });
+  };
+
   const filteredProducts = products.filter((p) => {
     const search = searchTerm.toLowerCase();
     const matchesSearch =
@@ -86,7 +102,12 @@ export default function POS() {
       p.category.toLowerCase().includes(search) ||
       p.sku.toLowerCase().includes(search);
 
-    const matchesBarcode = barcodeSearch ? (p.sku?.toLowerCase().includes(barcodeSearch.toLowerCase()) || p.id?.toLowerCase().includes(barcodeSearch.toLowerCase())) : true;
+    const matchesBarcode = normalizedBarcodeSearch
+      ? [p.sku, p.id, p.barcode]
+          .filter(Boolean)
+          .map((value) => String(value).toLowerCase())
+          .some((value) => value.includes(normalizedBarcodeSearch))
+      : true;
 
     const matchesCategory = selectedCategory === "all" ? true : p.category === selectedCategory;
 
@@ -107,6 +128,20 @@ export default function POS() {
     });
   };
 
+  const handleBarcodeSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    const matches = findBarcodeMatches(barcodeSearch);
+    if (matches.length === 0) {
+      return;
+    }
+
+    handleAddToCart(matches[0].id);
+    setBarcodeSearch("");
+  };
+
   const handleIncrement = (id: string) => {
     setCart((prev) => prev.map((item) => item.id === id ? { ...item, quantity: item.quantity + 1 } : item));
   };
@@ -121,6 +156,10 @@ export default function POS() {
 
   const handleDiscountChange = (id: string, value: number) => {
     setCart((prev) => prev.map((item) => item.id === id ? { ...item, discount: Math.max(0, value) } : item));
+  };
+
+  const handlePriceChange = (id: string, value: number) => {
+    setCart((prev) => prev.map((item) => item.id === id ? { ...item, price: Math.max(0.01, value) } : item));
   };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -154,7 +193,17 @@ export default function POS() {
       observation,
     };
 
-    await apiRequest("POST", "/api/sales", salePayload);
+    const response = await apiRequest("POST", "/api/sales", salePayload);
+    const sale = await response.json();
+
+    // Imprimir comprovante
+    const html = buildSaleReceiptHtml({ sale });
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+
     setCart([]);
     setShowPaymentDialog(false);
     setShowObservationDialog(false);
@@ -224,10 +273,11 @@ export default function POS() {
             <div className="relative flex-1">
               <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por código de barras..."
+                placeholder="Digite ou escaneie o código de barras..."
                 className="pl-9 pr-20"
                 value={barcodeSearch}
                 onChange={(e) => setBarcodeSearch(e.target.value)}
+                onKeyDown={handleBarcodeSearchKeyDown}
                 data-testid="input-barcode-search"
               />
               {barcodeSearch && (
@@ -375,6 +425,8 @@ export default function POS() {
                     onIncrement={handleIncrement}
                     onDecrement={handleDecrement}
                     onRemove={handleRemove}
+                    onDiscountChange={handleDiscountChange}
+                    onPriceChange={handlePriceChange}
                   />
                   <div className="flex items-center gap-2">
                     <Label className="text-xs">Desconto</Label>
