@@ -1,0 +1,12 @@
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/bin/Debug/net8.0/PDV.Dominio.deps.json
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/bin/Debug/net8.0/PDV.Dominio.dll
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/bin/Debug/net8.0/PDV.Dominio.pdb
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/PDV.Dominio.GeneratedMSBuildEditorConfig.editorconfig
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/PDV.Dominio.AssemblyInfoInputs.cache
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/PDV.Dominio.AssemblyInfo.cs
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/PDV.Dominio.csproj.CoreCompileInputs.cache
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/PDV.Dominio.sourcelink.json
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/PDV.Dominio.dll
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/refint/PDV.Dominio.dll
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/PDV.Dominio.pdb
+/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/Debug/net8.0/ref/PDV.Dominio.dll
