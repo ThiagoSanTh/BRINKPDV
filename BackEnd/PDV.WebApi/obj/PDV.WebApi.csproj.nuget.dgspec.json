@@ -1,0 +1,378 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.WebApi/PDV.WebApi.csproj": {}
+  },
+  "projects": {
+    "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj",
+        "projectName": "PDV.Dominio",
+        "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj",
+        "packagesPath": "/home/thsanth/.nuget/packages/",
+        "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/thsanth/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/thsanth/.dotnet/sdk/8.0.424/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj",
+        "projectName": "PDV.Infraestrutura",
+        "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj",
+        "packagesPath": "/home/thsanth/.nuget/packages/",
+        "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/thsanth/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Microsoft.EntityFrameworkCore.Relational": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/thsanth/.dotnet/sdk/8.0.424/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Repositorio/PDV.Repositorio.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Repositorio/PDV.Repositorio.csproj",
+        "projectName": "PDV.Repositorio",
+        "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Repositorio/PDV.Repositorio.csproj",
+        "packagesPath": "/home/thsanth/.nuget/packages/",
+        "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Repositorio/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/thsanth/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj"
+              },
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/thsanth/.dotnet/sdk/8.0.424/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/PDV.Servico.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/PDV.Servico.csproj",
+        "projectName": "PDV.Servico",
+        "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/PDV.Servico.csproj",
+        "packagesPath": "/home/thsanth/.nuget/packages/",
+        "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/thsanth/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj"
+              },
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Repositorio/PDV.Repositorio.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Repositorio/PDV.Repositorio.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.2.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/thsanth/.dotnet/sdk/8.0.424/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.WebApi/PDV.WebApi.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.WebApi/PDV.WebApi.csproj",
+        "projectName": "PDV.WebApi",
+        "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.WebApi/PDV.WebApi.csproj",
+        "packagesPath": "/home/thsanth/.nuget/packages/",
+        "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.WebApi/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/thsanth/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj"
+              },
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj"
+              },
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Repositorio/PDV.Repositorio.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Repositorio/PDV.Repositorio.csproj"
+              },
+              "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/PDV.Servico.csproj": {
+                "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/PDV.Servico.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.2.0, )"
+            },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.11, )"
+            },
+            "Swashbuckle.AspNetCore": {
+              "target": "Package",
+              "version": "[6.6.2, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/thsanth/.dotnet/sdk/8.0.424/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
