@@ -1,0 +1,10 @@
+.git
+.cursor
+FrontEnd
+SistemaAntigo
+**/bin
+**/obj
+**/.vs
+**/.idea
+*.user
+*.md
