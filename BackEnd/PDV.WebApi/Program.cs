@@ -10,9 +10,7 @@ using PDV.WebApi.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var conexao = builder.Configuration.GetConnectionString("Postgres")
-    ?? Environment.GetEnvironmentVariable("PDV_POSTGRES")
-    ?? string.Empty;
+var conexao = ConexaoPostgres.Resolver(builder.Configuration) ?? string.Empty;
 
 builder.Services.AddDbContext<PdvDbContext>(opcoes => opcoes.UseNpgsql(conexao));
 
@@ -99,10 +97,20 @@ app.MapGet("/api/status", async (PdvDbContext contexto, CancellationToken cancel
 if (string.IsNullOrWhiteSpace(conexao))
 {
     app.Logger.LogWarning(
-        "Connection string do Postgres não configurada. Defina ConnectionStrings:Postgres ou a variável PDV_POSTGRES.");
+        "Connection string do Postgres não configurada. Defina PDV_POSTGRES com o Session pooler IPv4 do Supabase.");
 }
 else
 {
+    var host = ConexaoPostgres.ExtrairHost(conexao);
+    app.Logger.LogInformation("Postgres configurado para o host {Host}", host ?? "(desconhecido)");
+
+    if (ConexaoPostgres.PareceHostIpv6Somente(conexao))
+    {
+        app.Logger.LogWarning(
+            "O host {Host} do Supabase é só IPv6. Use o Session pooler (aws-0-….pooler.supabase.com) em PDV_POSTGRES.",
+            host);
+    }
+
     try
     {
         await InicializadorBanco.PrepararAsync(app.Services, app.Logger);
