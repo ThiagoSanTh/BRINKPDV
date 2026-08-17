@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PDV.WebApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+15bab1d56820ba6361bb47e8c4538c8bd4398b7b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cd369fe662dbf17261feb1413ba30c3d9c4fee47")]
 [assembly: System.Reflection.AssemblyProductAttribute("PDV.WebApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PDV.WebApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
