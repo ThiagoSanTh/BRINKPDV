@@ -12,6 +12,7 @@ public static class InicializadorBanco
         var contexto = escopo.ServiceProvider.GetRequiredService<PdvDbContext>();
 
         await contexto.Database.MigrateAsync(cancelamento);
+        await RemoverDadosDeTesteAsync(contexto, logger, cancelamento);
 
         var ambiente = provedor.GetRequiredService<IHostEnvironment>();
         var senhaInicial = Environment.GetEnvironmentVariable("PDV_ADMIN_SENHA");
@@ -55,6 +56,41 @@ public static class InicializadorBanco
 
         await contexto.SaveChangesAsync(cancelamento);
         await SincronizarClientesDasOrdensAsync(contexto, logger, cancelamento);
+    }
+
+    private static async Task RemoverDadosDeTesteAsync(
+        PdvDbContext contexto,
+        ILogger logger,
+        CancellationToken cancelamento)
+    {
+        var loja = await contexto.ConfiguracoesLoja.AsNoTracking().FirstOrDefaultAsync(cancelamento);
+        var temLixoDeTeste =
+            (loja?.NomeLoja?.Contains("Playwright", StringComparison.OrdinalIgnoreCase) ?? false)
+            || await contexto.Produtos.AnyAsync(
+                produto => produto.Nome.Contains("Playwright")
+                    || produto.Nome.Contains("Produto Validação"),
+                cancelamento);
+
+        if (!temLixoDeTeste)
+        {
+            return;
+        }
+
+        await contexto.Database.ExecuteSqlRawAsync(
+            """
+            DELETE FROM cash_movements;
+            DELETE FROM sales;
+            DELETE FROM service_orders;
+            DELETE FROM clients;
+            DELETE FROM products;
+            DELETE FROM salespersons;
+            DELETE FROM store_settings;
+            DELETE FROM users WHERE username IS DISTINCT FROM 'admin';
+            """,
+            cancelamento);
+
+        contexto.ChangeTracker.Clear();
+        logger.LogInformation("Dados de teste removidos. O banco ficou só com o login admin.");
     }
 
     private static async Task SincronizarClientesDasOrdensAsync(
