@@ -806,7 +806,7 @@
     ]
   },
   "packageFolders": {
-    "/home/thsanth/.nuget/packages/": {}
+    "/tmp/cursor-sandbox-cache/22591a313313a58cf5dfcc9895940fa9/nuget": {}
   },
   "project": {
     "version": "1.0.0",
@@ -814,7 +814,7 @@
       "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/PDV.Servico.csproj",
       "projectName": "PDV.Servico",
       "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/PDV.Servico.csproj",
-      "packagesPath": "/home/thsanth/.nuget/packages/",
+      "packagesPath": "/tmp/cursor-sandbox-cache/22591a313313a58cf5dfcc9895940fa9/nuget",
       "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Servico/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
