@@ -107,4 +107,18 @@ public class RepositorioOrdemServico : IRepositorioOrdemServico
         await _contexto.SaveChangesAsync(cancelamento);
         return existente;
     }
+
+    public async Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default)
+    {
+        var existente = await _contexto.OrdensServico.FirstOrDefaultAsync(ordem => ordem.Id == id, cancelamento);
+
+        if (existente is null)
+        {
+            return false;
+        }
+
+        _contexto.OrdensServico.Remove(existente);
+        await _contexto.SaveChangesAsync(cancelamento);
+        return true;
+    }
 }

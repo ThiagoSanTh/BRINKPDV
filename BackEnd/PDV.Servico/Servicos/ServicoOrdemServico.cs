@@ -143,6 +143,11 @@ public class ServicoOrdemServico : IServicoOrdemServico
         return atualizada.ParaDto(whatsapp);
     }
 
+    public async Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default)
+    {
+        return await _repositorio.RemoverAsync(id, cancelamento);
+    }
+
     private async Task<Cliente> ResolverClienteAsync(
         OrdemServicoEntradaDto entrada,
         CancellationToken cancelamento,

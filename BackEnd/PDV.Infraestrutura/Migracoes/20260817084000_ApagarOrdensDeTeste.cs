@@ -10,9 +10,6 @@ namespace PDV.Infraestrutura.Migracoes
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DELETE FROM cash_movements;");
-            migrationBuilder.Sql("DELETE FROM sales;");
-            migrationBuilder.Sql("DELETE FROM service_orders;");
         }
 
         /// <inheritdoc />

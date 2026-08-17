@@ -12,7 +12,6 @@ public static class InicializadorBanco
         var contexto = escopo.ServiceProvider.GetRequiredService<PdvDbContext>();
 
         await contexto.Database.MigrateAsync(cancelamento);
-        await RemoverDadosDeTesteAsync(contexto, logger, cancelamento);
 
         var ambiente = provedor.GetRequiredService<IHostEnvironment>();
         var senhaInicial = Environment.GetEnvironmentVariable("PDV_ADMIN_SENHA");
@@ -56,46 +55,6 @@ public static class InicializadorBanco
 
         await contexto.SaveChangesAsync(cancelamento);
         await SincronizarClientesDasOrdensAsync(contexto, logger, cancelamento);
-    }
-
-    private static async Task RemoverDadosDeTesteAsync(
-        PdvDbContext contexto,
-        ILogger logger,
-        CancellationToken cancelamento)
-    {
-        var loja = await contexto.ConfiguracoesLoja.AsNoTracking().FirstOrDefaultAsync(cancelamento);
-        var temLixoDeTeste =
-            (loja?.NomeLoja?.Contains("Playwright", StringComparison.OrdinalIgnoreCase) ?? false)
-            || await contexto.Produtos.AnyAsync(
-                produto => produto.Nome.Contains("Playwright")
-                    || produto.Nome.Contains("Produto Validação"),
-                cancelamento)
-            || await contexto.OrdensServico.AnyAsync(
-                ordem => ordem.Cliente.Contains("Cliente PW")
-                    || ordem.Cliente.Contains("Playwright")
-                    || ordem.Cliente == "Maria Oficina"
-                    || ordem.Cliente == "Cliente 29523"
-                    || ordem.Cliente == "Cliente 54664"
-                    || ordem.Cliente == "Cliente 66318",
-                cancelamento);
-
-        if (!temLixoDeTeste)
-        {
-            return;
-        }
-
-        await contexto.MovimentosCaixa.ExecuteDeleteAsync(cancelamento);
-        await contexto.Vendas.ExecuteDeleteAsync(cancelamento);
-        await contexto.OrdensServico.ExecuteDeleteAsync(cancelamento);
-        await contexto.Clientes.ExecuteDeleteAsync(cancelamento);
-        await contexto.Produtos.ExecuteDeleteAsync(cancelamento);
-        await contexto.Vendedores.ExecuteDeleteAsync(cancelamento);
-        await contexto.Usuarios
-            .Where(usuario => usuario.NomeUsuario != "admin")
-            .ExecuteDeleteAsync(cancelamento);
-
-        contexto.ChangeTracker.Clear();
-        logger.LogInformation("Dados de teste removidos. O banco ficou só com o login admin.");
     }
 
     private static async Task SincronizarClientesDasOrdensAsync(

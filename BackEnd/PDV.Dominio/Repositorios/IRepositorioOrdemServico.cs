@@ -19,4 +19,6 @@ public interface IRepositorioOrdemServico
     Task<OrdemServico> CriarAsync(OrdemServico ordem, CancellationToken cancelamento = default);
 
     Task<OrdemServico?> AtualizarAsync(OrdemServico ordem, CancellationToken cancelamento = default);
+
+    Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default);
 }
