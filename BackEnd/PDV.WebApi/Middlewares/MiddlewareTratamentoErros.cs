@@ -28,6 +28,14 @@ public class MiddlewareTratamentoErros
         {
             await ResponderAsync(contexto, StatusCodes.Status404NotFound, excecao.Message);
         }
+        catch (Exception excecao) when (EhFalhaDeBanco(excecao))
+        {
+            _logger.LogError(excecao, "Falha de banco em {Caminho}", contexto.Request.Path);
+            await ResponderAsync(
+                contexto,
+                StatusCodes.Status503ServiceUnavailable,
+                "Não foi possível conectar ao banco. No Railway, PDV_POSTGRES precisa ser o Session pooler IPv4 do Supabase.");
+        }
         catch (Exception excecao)
         {
             _logger.LogError(excecao, "Falha não tratada em {Caminho}", contexto.Request.Path);
@@ -48,5 +56,20 @@ public class MiddlewareTratamentoErros
 
         var corpo = JsonSerializer.Serialize(new { mensagem });
         await contexto.Response.WriteAsync(corpo);
+    }
+
+    private static bool EhFalhaDeBanco(Exception excecao)
+    {
+        for (var atual = excecao; atual is not null; atual = atual.InnerException)
+        {
+            var nome = atual.GetType().FullName ?? string.Empty;
+            if (nome.Contains("Npgsql", StringComparison.Ordinal)
+                || atual is TimeoutException or System.Net.Sockets.SocketException)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
