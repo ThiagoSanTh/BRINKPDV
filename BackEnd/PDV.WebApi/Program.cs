@@ -15,8 +15,20 @@ var conexao = ConexaoPostgres.Resolver(builder.Configuration) ?? string.Empty;
 builder.Services.AddDbContext<PdvDbContext>(opcoes => opcoes.UseNpgsql(conexao));
 
 builder.Services.Configure<OpcoesJwt>(builder.Configuration.GetSection(OpcoesJwt.Secao));
+builder.Services.PostConfigure<OpcoesJwt>(opcoes =>
+{
+    if (string.IsNullOrWhiteSpace(opcoes.Chave) || Encoding.UTF8.GetByteCount(opcoes.Chave) < 32)
+    {
+        opcoes.Chave = new OpcoesJwt().Chave;
+    }
+});
 
 var opcoesJwt = builder.Configuration.GetSection(OpcoesJwt.Secao).Get<OpcoesJwt>() ?? new OpcoesJwt();
+
+if (string.IsNullOrWhiteSpace(opcoesJwt.Chave) || Encoding.UTF8.GetByteCount(opcoesJwt.Chave) < 32)
+{
+    opcoesJwt.Chave = new OpcoesJwt().Chave;
+}
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -83,9 +95,19 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-app.MapGet("/api/status", async (PdvDbContext contexto, CancellationToken cancelamento) =>
+app.MapGet("/api/status", async (PdvDbContext contexto) =>
 {
-    var conectado = await contexto.Database.CanConnectAsync(cancelamento);
+    var conectado = false;
+
+    try
+    {
+        using var espera = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        conectado = await contexto.Database.CanConnectAsync(espera.Token);
+    }
+    catch
+    {
+        conectado = false;
+    }
 
     return Results.Ok(new
     {
@@ -94,31 +116,36 @@ app.MapGet("/api/status", async (PdvDbContext contexto, CancellationToken cancel
     });
 });
 
-if (string.IsNullOrWhiteSpace(conexao))
+app.Lifetime.ApplicationStarted.Register(() =>
 {
-    app.Logger.LogWarning(
-        "Connection string do Postgres não configurada. Defina PDV_POSTGRES com o Session pooler IPv4 do Supabase.");
-}
-else
-{
-    var host = ConexaoPostgres.ExtrairHost(conexao);
-    app.Logger.LogInformation("Postgres configurado para o host {Host}", host ?? "(desconhecido)");
+    _ = Task.Run(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(conexao))
+        {
+            app.Logger.LogWarning(
+                "Connection string do Postgres não configurada. Defina PDV_POSTGRES com o Session pooler IPv4 do Supabase.");
+            return;
+        }
 
-    if (ConexaoPostgres.PareceHostIpv6Somente(conexao))
-    {
-        app.Logger.LogWarning(
-            "O host {Host} do Supabase é só IPv6. Use o Session pooler (aws-0-….pooler.supabase.com) em PDV_POSTGRES.",
-            host);
-    }
+        var host = ConexaoPostgres.ExtrairHost(conexao);
+        app.Logger.LogInformation("Postgres configurado para o host {Host}", host ?? "(desconhecido)");
 
-    try
-    {
-        await InicializadorBanco.PrepararAsync(app.Services, app.Logger);
-    }
-    catch (Exception excecao)
-    {
-        app.Logger.LogError(excecao, "Não foi possível preparar o banco de dados. A API sobe sem persistência funcional.");
-    }
-}
+        if (ConexaoPostgres.PareceHostIpv6Somente(conexao))
+        {
+            app.Logger.LogWarning(
+                "O host {Host} do Supabase é só IPv6. Use o Session pooler (aws-0-….pooler.supabase.com) em PDV_POSTGRES.",
+                host);
+        }
+
+        try
+        {
+            await InicializadorBanco.PrepararAsync(app.Services, app.Logger);
+        }
+        catch (Exception excecao)
+        {
+            app.Logger.LogError(excecao, "Não foi possível preparar o banco de dados. A API sobe sem persistência funcional.");
+        }
+    });
+});
 
 app.Run();
