@@ -4,12 +4,21 @@ public static class ConexaoPostgres
 {
     public static string? Resolver(IConfiguration configuracao)
     {
-        var bruta =
-            configuracao.GetConnectionString("Postgres")
-            ?? Environment.GetEnvironmentVariable("PDV_POSTGRES")
-            ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+        foreach (var candidato in new[]
+        {
+            Environment.GetEnvironmentVariable("PDV_POSTGRES"),
+            Environment.GetEnvironmentVariable("DATABASE_URL"),
+            configuracao["ConnectionStrings:Postgres"],
+            configuracao.GetConnectionString("Postgres"),
+        })
+        {
+            if (!string.IsNullOrWhiteSpace(candidato))
+            {
+                return Normalizar(candidato);
+            }
+        }
 
-        return Normalizar(bruta);
+        return null;
     }
 
     public static string? Normalizar(string? conexao)

@@ -113,6 +113,7 @@ app.MapGet("/api/status", async (PdvDbContext contexto) =>
     {
         api = "online",
         banco = conectado ? "conectado" : "indisponivel",
+        postgres = string.IsNullOrWhiteSpace(conexao) ? "ausente" : "configurado",
     });
 });
 
