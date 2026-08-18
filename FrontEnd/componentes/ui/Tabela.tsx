@@ -3,6 +3,12 @@ import { ScrollView, StyleProp, Text, TextStyle, View, ViewStyle } from "react-n
 import { useTema } from "../../tema/TemaProvider";
 import { espaco, fonte } from "../../tema/tokens";
 
+const alinhamentoTexto = {
+  "flex-start": "left",
+  center: "center",
+  "flex-end": "right",
+} as const;
+
 export function Tabela({
   children,
   larguraMinima,
@@ -10,19 +16,15 @@ export function Tabela({
   children: React.ReactNode;
   larguraMinima?: number;
 }) {
-  if (!larguraMinima) {
-    return <View>{children}</View>;
-  }
-
   return (
     <ScrollView
       horizontal
       nestedScrollEnabled
       showsHorizontalScrollIndicator
       style={{ width: "100%" }}
-      contentContainerStyle={{ minWidth: larguraMinima }}
+      contentContainerStyle={{ flexGrow: 1, minWidth: larguraMinima ?? "100%" }}
     >
-      <View style={{ width: larguraMinima, minWidth: larguraMinima }}>{children}</View>
+      <View style={{ flexGrow: 1, width: "100%", minWidth: larguraMinima }}>{children}</View>
     </ScrollView>
   );
 }
@@ -47,6 +49,7 @@ export function LinhaTabela({
         {
           flexDirection: "row",
           alignItems: "center",
+          width: "100%",
           gap: espaco.sm,
           paddingVertical: cabecalho ? espaco.sm : espaco.md,
           borderBottomWidth: 1,
@@ -63,7 +66,7 @@ export function LinhaTabela({
 export function CelulaTabela({
   children,
   proporcao = 1,
-  alinhamento = "flex-start",
+  alinhamento = "center",
   cabecalho,
   estiloTexto,
   testID,
@@ -88,6 +91,8 @@ export function CelulaTabela({
             fontSize: cabecalho ? fonte.xs : fonte.base,
             fontWeight: cabecalho ? "600" : "400",
             textTransform: cabecalho ? "uppercase" : "none",
+            textAlign: alinhamentoTexto[alinhamento],
+            width: "100%",
           },
           estiloTexto,
         ]}
@@ -102,9 +107,9 @@ export function CelulaTabela({
     <View
       style={{
         flexGrow: proporcao,
-        flexShrink: 0,
+        flexShrink: 1,
         flexBasis: 0,
-        minWidth: 72 * proporcao,
+        minWidth: 56,
         alignItems: alinhamento,
         justifyContent: "center",
       }}

@@ -261,7 +261,7 @@ export default function TelaOrdensServico() {
                     <CelulaTabela cabecalho proporcao={1.2}>
                       Prioridade
                     </CelulaTabela>
-                    <CelulaTabela cabecalho proporcao={1.2} alinhamento="flex-end">
+                    <CelulaTabela cabecalho proporcao={1.2}>
                       Valor
                     </CelulaTabela>
                     <CelulaTabela cabecalho proporcao={1.2}>
@@ -270,7 +270,7 @@ export default function TelaOrdensServico() {
                     <CelulaTabela cabecalho proporcao={1.2}>
                       Saída
                     </CelulaTabela>
-                    <CelulaTabela cabecalho proporcao={2} alinhamento="flex-end">
+                    <CelulaTabela cabecalho proporcao={2}>
                       Ações
                     </CelulaTabela>
                   </LinhaTabela>
@@ -294,7 +294,7 @@ export default function TelaOrdensServico() {
                           variante={variantesPrioridade[ordem.prioridade] ?? "primario"}
                         />
                       </CelulaTabela>
-                      <CelulaTabela proporcao={1.2} alinhamento="flex-end">
+                      <CelulaTabela proporcao={1.2}>
                         {moeda(ordem.valor)}
                       </CelulaTabela>
                       <CelulaTabela proporcao={1.2}>{dataCurta(ordem.prazo)}</CelulaTabela>
@@ -307,8 +307,8 @@ export default function TelaOrdensServico() {
                           <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>—</Text>
                         )}
                       </CelulaTabela>
-                      <CelulaTabela proporcao={2} alinhamento="flex-end">
-                        <View style={{ flexDirection: "row", gap: espaco.xs, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <CelulaTabela proporcao={2}>
+                        <View style={{ flexDirection: "row", gap: espaco.xs, flexWrap: "wrap", justifyContent: "center" }}>
                           <Botao
                             testID={`button-view-${ordem.id}`}
                             variante="fantasma"

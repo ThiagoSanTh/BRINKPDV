@@ -362,19 +362,19 @@ export default function TelaProdutos() {
                   <CelulaTabela cabecalho proporcao={1.6}>
                     Categoria
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1.3} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1.3}>
                     Preço Custo
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1.3} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1.3}>
                     Preço Venda
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1}>
                     Margem
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1}>
                     Estoque
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1.2} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1.2}>
                     Ações
                   </CelulaTabela>
                 </LinhaTabela>
@@ -394,19 +394,17 @@ export default function TelaProdutos() {
                       </CelulaTabela>
                       <CelulaTabela
                         proporcao={1.3}
-                        alinhamento="flex-end"
                         estiloTexto={{ color: cores.suaveTexto }}
                       >
                         {moeda(custo)}
                       </CelulaTabela>
                       <CelulaTabela
                         proporcao={1.3}
-                        alinhamento="flex-end"
                         estiloTexto={{ fontWeight: "600" }}
                       >
                         {moeda(produto.preco)}
                       </CelulaTabela>
-                      <CelulaTabela proporcao={1} alinhamento="flex-end">
+                      <CelulaTabela proporcao={1}>
                         {custo > 0 ? (
                           <Selo
                             texto={`${margem.toFixed(1)}%`}
@@ -416,7 +414,7 @@ export default function TelaProdutos() {
                           <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>-</Text>
                         )}
                       </CelulaTabela>
-                      <CelulaTabela proporcao={1} alinhamento="flex-end">
+                      <CelulaTabela proporcao={1}>
                         {produto.estoque < 10 ? (
                           <Selo texto={String(produto.estoque)} variante="perigo" />
                         ) : (
@@ -425,8 +423,8 @@ export default function TelaProdutos() {
                           </Text>
                         )}
                       </CelulaTabela>
-                      <CelulaTabela proporcao={1.2} alinhamento="flex-end">
-                        <View style={{ flexDirection: "row", gap: espaco.sm }}>
+                      <CelulaTabela proporcao={1.2}>
+                        <View style={{ flexDirection: "row", gap: espaco.sm, justifyContent: "center" }}>
                           <Botao
                             testID={`button-edit-${produto.id}`}
                             variante="fantasma"

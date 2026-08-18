@@ -277,13 +277,13 @@ export default function TelaVendedores() {
                   <CelulaTabela cabecalho proporcao={1.6}>
                     Telefone
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1.2} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1.2}>
                     Comissão (%)
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1.4} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1.4}>
                     Vendas Totais
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1.6} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1.6}>
                     Comissão a Receber
                   </CelulaTabela>
                   <CelulaTabela cabecalho proporcao={1.4}>
@@ -292,7 +292,7 @@ export default function TelaVendedores() {
                   <CelulaTabela cabecalho proporcao={1}>
                     Status
                   </CelulaTabela>
-                  <CelulaTabela cabecalho proporcao={1.2} alinhamento="flex-end">
+                  <CelulaTabela cabecalho proporcao={1.2}>
                     Ações
                   </CelulaTabela>
                 </LinhaTabela>
@@ -310,17 +310,15 @@ export default function TelaVendedores() {
                     </CelulaTabela>
                     <CelulaTabela
                       proporcao={1.2}
-                      alinhamento="flex-end"
                       estiloTexto={{ fontWeight: "600" }}
                     >
                       {`${vendedor.comissao.toFixed(1)}%`}
                     </CelulaTabela>
-                    <CelulaTabela proporcao={1.4} alinhamento="flex-end">
+                    <CelulaTabela proporcao={1.4}>
                       {moeda(vendedor.totalVendas)}
                     </CelulaTabela>
                     <CelulaTabela
                       proporcao={1.6}
-                      alinhamento="flex-end"
                       estiloTexto={{ color: cores.primaria, fontWeight: "600" }}
                     >
                       {moeda((vendedor.totalVendas * vendedor.comissao) / 100)}
@@ -334,8 +332,8 @@ export default function TelaVendedores() {
                         variante={vendedor.ativo ? "primario" : "suave"}
                       />
                     </CelulaTabela>
-                    <CelulaTabela proporcao={1.2} alinhamento="flex-end">
-                      <View style={{ flexDirection: "row", gap: espaco.sm }}>
+                    <CelulaTabela proporcao={1.2}>
+                      <View style={{ flexDirection: "row", gap: espaco.sm, justifyContent: "center" }}>
                         <Botao
                           testID={`button-edit-${vendedor.id}`}
                           variante="fantasma"
