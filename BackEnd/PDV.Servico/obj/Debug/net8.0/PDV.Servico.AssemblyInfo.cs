@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PDV.Servico")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5658bd01bc13cb8c89c06289a691d1cfff578b0a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+400782792cedb56cf1405b3d7f8b19f74ce9e7cf")]
 [assembly: System.Reflection.AssemblyProductAttribute("PDV.Servico")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PDV.Servico")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

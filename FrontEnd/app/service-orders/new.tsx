@@ -8,6 +8,7 @@ import { useAvisos } from "../../componentes/ui/Avisos";
 import { Botao } from "../../componentes/ui/Botao";
 import { AreaTexto, Campo, Rotulo } from "../../componentes/ui/Campo";
 import { Cartao } from "../../componentes/ui/Cartao";
+import { Dialogo } from "../../componentes/ui/Dialogo";
 import { Seletor } from "../../componentes/ui/Seletor";
 import { TituloPagina } from "../../componentes/ui/TituloPagina";
 import { api } from "../../lib/api";
@@ -22,7 +23,6 @@ import {
   statusOrdemServico,
   tiposAparelho,
 } from "../../lib/tipos";
-import { abrirWhatsApp } from "../../lib/whatsapp";
 import { useTema } from "../../tema/TemaProvider";
 import { espaco, fonte } from "../../tema/tokens";
 
@@ -31,9 +31,18 @@ export default function TelaNovaOrdemServico() {
   const { avisar } = useAvisos();
   const roteador = useRouter();
   const clienteConsultas = useQueryClient();
-  const { clienteId: clienteIdParam } = useLocalSearchParams<{ clienteId?: string }>();
+  const { clienteId: clienteIdParam, id: idParam } = useLocalSearchParams<{
+    clienteId?: string;
+    id?: string;
+  }>();
+  const idEdicao = Array.isArray(idParam) ? idParam[0] : idParam;
+  const editando = Boolean(idEdicao);
 
   const { data: clientes = [] } = useQuery<Cliente[]>({ queryKey: chaves.clientes });
+  const { data: ordemAtual } = useQuery<OrdemServico>({
+    queryKey: ["/api/ordens-servico/", idEdicao],
+    enabled: editando,
+  });
 
   const [modoCliente, setModoCliente] = useState<"existente" | "novo">("existente");
   const [clienteId, setClienteId] = useState<string | null>(null);
@@ -49,23 +58,46 @@ export default function TelaNovaOrdemServico() {
   const [status, setStatus] = useState<string>("Orçamento");
   const [prazo, setPrazo] = useState("");
   const [valor, setValor] = useState("");
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
   useEffect(() => {
     const id = Array.isArray(clienteIdParam) ? clienteIdParam[0] : clienteIdParam;
 
-    if (id) {
+    if (id && !editando) {
       setModoCliente("existente");
       setClienteId(id);
     }
-  }, [clienteIdParam]);
+  }, [clienteIdParam, editando]);
 
   useEffect(() => {
-    if (clienteId || clientes.length === 0) {
+    if (editando || clienteId || clientes.length === 0) {
       return;
     }
 
     setClienteId(clientes[0].id);
-  }, [clientes, clienteId]);
+  }, [clientes, clienteId, editando]);
+
+  useEffect(() => {
+    if (!ordemAtual) {
+      return;
+    }
+
+    const marcaLista = marcasAparelho.includes(ordemAtual.marca as (typeof marcasAparelho)[number]);
+    setClienteId(ordemAtual.clienteId);
+    setNomeCliente(ordemAtual.cliente);
+    setTelefoneCliente(ordemAtual.contatoCliente);
+    setModoCliente("novo");
+    setTipoAparelho(ordemAtual.tipoAparelho || "Smartphone");
+    setMarca(marcaLista ? ordemAtual.marca : "Outra");
+    setMarcaOutra(marcaLista ? "" : ordemAtual.marca);
+    setModelo(ordemAtual.modelo);
+    setEstadoAparelho(ordemAtual.estadoAparelho || "Bom");
+    setProblema(ordemAtual.problema);
+    setPrioridade(ordemAtual.prioridade);
+    setStatus(ordemAtual.status);
+    setPrazo(ordemAtual.prazo?.slice(0, 10) ?? "");
+    setValor(String(ordemAtual.valor ?? 0).replace(".", ","));
+  }, [ordemAtual]);
 
   const opcoesClientes = useMemo(
     () => clientes.map((cliente) => ({ valor: cliente.id, rotulo: `${cliente.nome} — ${cliente.telefone}` })),
@@ -80,10 +112,56 @@ export default function TelaNovaOrdemServico() {
     },
   });
 
-  async function salvar() {
+  const atualizar = useMutation({
+    mutationFn: (dados: unknown) => api.atualizar<OrdemServico>(`/api/ordens-servico/${idEdicao}`, dados),
+    onSuccess: () => {
+      clienteConsultas.invalidateQueries({ queryKey: chaves.ordensServico });
+      clienteConsultas.invalidateQueries({ queryKey: chaves.clientes });
+    },
+  });
+
+  const excluir = useMutation({
+    mutationFn: () => api.remover(`/api/ordens-servico/${idEdicao}`),
+    onSuccess: () => {
+      clienteConsultas.invalidateQueries({ queryKey: chaves.ordensServico });
+      clienteConsultas.invalidateQueries({ queryKey: chaves.clientes });
+    },
+  });
+
+  function preencherCliente(id: string) {
+    setClienteId(id);
+    const cliente = clientes.find((item) => item.id === id);
+
+    if (cliente) {
+      setNomeCliente(cliente.nome);
+      setTelefoneCliente(cliente.telefone);
+    }
+  }
+
+  function montarPayload() {
     const marcaFinal = marca === "Outra" ? marcaOutra.trim() : marca;
 
-    if (modoCliente === "existente" && !clienteId) {
+    return {
+      clienteId: clienteId || null,
+      cliente: nomeCliente.trim() || undefined,
+      contatoCliente: telefoneCliente.trim() || undefined,
+      tipoAparelho,
+      marca: marcaFinal,
+      modelo: modelo.trim(),
+      estadoAparelho,
+      problema: problema.trim(),
+      prioridade,
+      status,
+      valor: paraNumero(valor),
+      prazo: prazo || null,
+    };
+  }
+
+  async function salvar() {
+    const marcaFinal = marca === "Outra" ? marcaOutra.trim() : marca;
+    const usandoCadastro = !editando && modoCliente === "existente";
+
+    if (usandoCadastro && !clienteId) {
       avisar({
         titulo: "Cliente obrigatório",
         descricao: "Selecione um cliente ou cadastre um novo.",
@@ -92,7 +170,7 @@ export default function TelaNovaOrdemServico() {
       return;
     }
 
-    if (modoCliente === "novo" && (!nomeCliente.trim() || !telefoneCliente.trim())) {
+    if ((!usandoCadastro || editando) && (!nomeCliente.trim() || !telefoneCliente.trim())) {
       avisar({
         titulo: "Cliente obrigatório",
         descricao: "Preencha nome e telefone do cliente.",
@@ -111,38 +189,56 @@ export default function TelaNovaOrdemServico() {
     }
 
     try {
-      const ordem = await criar.mutateAsync({
-        clienteId: modoCliente === "existente" ? clienteId : null,
-        cliente: modoCliente === "novo" ? nomeCliente.trim() : undefined,
-        contatoCliente: modoCliente === "novo" ? telefoneCliente.trim() : undefined,
-        tipoAparelho,
-        marca: marcaFinal,
-        modelo: modelo.trim(),
-        estadoAparelho,
-        problema: problema.trim(),
-        prioridade,
-        status,
-        valor: paraNumero(valor),
-        prazo: prazo || null,
-      });
+      const dados = montarPayload();
 
-      avisar({ titulo: "Ordem de Serviço criada", descricao: `${ordem.numero} foi salva com sucesso.` });
-      await abrirWhatsApp(ordem.whatsApp);
+      if (editando) {
+        const ordem = await atualizar.mutateAsync(dados);
+        avisar({ titulo: "Ordem atualizada", descricao: `${ordem.numero} foi salva.` });
+      } else {
+        const ordem = await criar.mutateAsync(
+          usandoCadastro
+            ? { ...dados, cliente: undefined, contatoCliente: undefined }
+            : { ...dados, clienteId: null },
+        );
+        avisar({ titulo: "Ordem de Serviço criada", descricao: `${ordem.numero} foi salva com sucesso.` });
+      }
+
       roteador.replace("/service-orders");
     } catch (erro) {
       avisar({
-        titulo: "Erro ao criar ordem",
+        titulo: editando ? "Erro ao atualizar ordem" : "Erro ao criar ordem",
         descricao: erro instanceof Error ? erro.message : "Não foi possível salvar a ordem de serviço.",
         variante: "perigo",
       });
     }
   }
 
+  async function confirmarRemocao() {
+    try {
+      await excluir.mutateAsync();
+      setConfirmarExclusao(false);
+      avisar({ titulo: "Ordem excluída", descricao: "A OS foi removida." });
+      roteador.replace("/service-orders");
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao excluir",
+        descricao: erro instanceof Error ? erro.message : "Não foi possível excluir a ordem.",
+        variante: "perigo",
+      });
+    }
+  }
+
+  const salvando = criar.isPending || atualizar.isPending;
+
   return (
     <View style={{ gap: espaco.xl }}>
       <TituloPagina
-        titulo="Nova Ordem de Serviço"
-        descricao="Cadastro de manutenção com aviso no WhatsApp"
+        titulo={editando ? "Editar Ordem de Serviço" : "Nova Ordem de Serviço"}
+        descricao={
+          editando
+            ? "Altere qualquer informação da OS, inclusive cliente e telefone"
+            : "Cadastro de manutenção — compartilhe no WhatsApp depois, se quiser"
+        }
         acoes={
           <Botao
             testID="button-back-service-orders"
@@ -158,60 +254,100 @@ export default function TelaNovaOrdemServico() {
         <View style={{ padding: espaco.xl, gap: espaco.lg }}>
           <Text style={{ color: cores.texto, fontSize: fonte.lg, fontWeight: "600" }}>Cliente</Text>
 
-          <View style={{ flexDirection: "row", gap: espaco.sm, flexWrap: "wrap" }}>
-            <Botao
-              testID="button-client-existing"
-              titulo="Cliente cadastrado"
-              variante={modoCliente === "existente" ? "primario" : "contorno"}
-              onPress={() => setModoCliente("existente")}
-            />
-            <Botao
-              testID="button-client-new"
-              titulo="Cadastrar agora"
-              variante={modoCliente === "novo" ? "primario" : "contorno"}
-              onPress={() => setModoCliente("novo")}
-            />
-          </View>
-
-          {modoCliente === "existente" ? (
-            clientes.length === 0 ? (
-              <Text style={{ color: cores.suaveTexto }}>
-                Nenhum cliente cadastrado. Use “Cadastrar agora” para criar o primeiro.
-              </Text>
-            ) : (
-              <View style={{ gap: espaco.sm }}>
-                <Rotulo>Cliente *</Rotulo>
-                <Seletor
-                  testID="select-client"
-                  valor={clienteId}
-                  onChange={(valor) => setClienteId(valor)}
-                  opcoes={opcoesClientes}
-                  placeholder="Selecione o cliente"
-                />
+          {editando ? (
+            <>
+              {clientes.length > 0 ? (
+                <View style={{ gap: espaco.sm }}>
+                  <Rotulo>Carregar cliente cadastrado</Rotulo>
+                  <Seletor
+                    testID="select-client"
+                    valor={clienteId}
+                    onChange={preencherCliente}
+                    opcoes={opcoesClientes}
+                    placeholder="Manter os dados atuais"
+                  />
+                </View>
+              ) : null}
+              <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
+                <View style={{ flex: 1, gap: espaco.sm }}>
+                  <Rotulo>Nome *</Rotulo>
+                  <Campo
+                    testID="input-customer"
+                    valor={nomeCliente}
+                    onChange={setNomeCliente}
+                    placeholder="Nome do cliente"
+                  />
+                </View>
+                <View style={{ flex: 1, gap: espaco.sm }}>
+                  <Rotulo>Telefone *</Rotulo>
+                  <Campo
+                    testID="input-customer-contact"
+                    valor={telefoneCliente}
+                    onChange={setTelefoneCliente}
+                    placeholder="(11) 98765-4321"
+                    teclado="phone-pad"
+                  />
+                </View>
               </View>
-            )
+            </>
           ) : (
-            <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
-              <View style={{ flex: 1, gap: espaco.sm }}>
-                <Rotulo>Nome *</Rotulo>
-                <Campo
-                  testID="input-customer"
-                  valor={nomeCliente}
-                  onChange={setNomeCliente}
-                  placeholder="Nome do cliente"
+            <>
+              <View style={{ flexDirection: "row", gap: espaco.sm, flexWrap: "wrap" }}>
+                <Botao
+                  testID="button-client-existing"
+                  titulo="Cliente cadastrado"
+                  variante={modoCliente === "existente" ? "primario" : "contorno"}
+                  onPress={() => setModoCliente("existente")}
+                />
+                <Botao
+                  testID="button-client-new"
+                  titulo="Cadastrar agora"
+                  variante={modoCliente === "novo" ? "primario" : "contorno"}
+                  onPress={() => setModoCliente("novo")}
                 />
               </View>
-              <View style={{ flex: 1, gap: espaco.sm }}>
-                <Rotulo>Telefone *</Rotulo>
-                <Campo
-                  testID="input-customer-contact"
-                  valor={telefoneCliente}
-                  onChange={setTelefoneCliente}
-                  placeholder="(11) 98765-4321"
-                  teclado="phone-pad"
-                />
-              </View>
-            </View>
+
+              {modoCliente === "existente" ? (
+                clientes.length === 0 ? (
+                  <Text style={{ color: cores.suaveTexto }}>
+                    Nenhum cliente cadastrado. Use “Cadastrar agora” para criar o primeiro.
+                  </Text>
+                ) : (
+                  <View style={{ gap: espaco.sm }}>
+                    <Rotulo>Cliente *</Rotulo>
+                    <Seletor
+                      testID="select-client"
+                      valor={clienteId}
+                      onChange={preencherCliente}
+                      opcoes={opcoesClientes}
+                      placeholder="Selecione o cliente"
+                    />
+                  </View>
+                )
+              ) : (
+                <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
+                  <View style={{ flex: 1, gap: espaco.sm }}>
+                    <Rotulo>Nome *</Rotulo>
+                    <Campo
+                      testID="input-customer"
+                      valor={nomeCliente}
+                      onChange={setNomeCliente}
+                      placeholder="Nome do cliente"
+                    />
+                  </View>
+                  <View style={{ flex: 1, gap: espaco.sm }}>
+                    <Rotulo>Telefone *</Rotulo>
+                    <Campo
+                      testID="input-customer-contact"
+                      valor={telefoneCliente}
+                      onChange={setTelefoneCliente}
+                      placeholder="(11) 98765-4321"
+                      teclado="phone-pad"
+                    />
+                  </View>
+                </View>
+              )}
+            </>
           )}
         </View>
       </Cartao>
@@ -328,14 +464,44 @@ export default function TelaNovaOrdemServico() {
             </View>
           </View>
 
-          <Botao
-            testID="button-save-service-order"
-            titulo="Salvar Ordem"
-            carregando={criar.isPending}
-            onPress={salvar}
-          />
+          <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
+            <Botao
+              testID="button-save-service-order"
+              titulo={editando ? "Salvar alterações" : "Salvar Ordem"}
+              carregando={salvando}
+              onPress={salvar}
+            />
+            {editando ? (
+              <Botao
+                testID="button-delete-service-order"
+                titulo="Excluir OS"
+                variante="perigo"
+                onPress={() => setConfirmarExclusao(true)}
+              />
+            ) : null}
+          </View>
         </View>
       </Cartao>
+
+      <Dialogo
+        aberto={confirmarExclusao}
+        onFechar={() => setConfirmarExclusao(false)}
+        titulo="Excluir ordem de serviço?"
+        descricao="Essa ação não pode ser desfeita."
+        testID="dialog-delete-service-order"
+        rodape={
+          <>
+            <Botao variante="contorno" titulo="Cancelar" onPress={() => setConfirmarExclusao(false)} />
+            <Botao
+              testID="button-confirm-delete-service-order"
+              variante="perigo"
+              titulo="Excluir"
+              carregando={excluir.isPending}
+              onPress={confirmarRemocao}
+            />
+          </>
+        }
+      />
     </View>
   );
 }

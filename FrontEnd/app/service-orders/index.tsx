@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { CheckCircle, Eye, Plus, Printer, Search, Wrench } from "lucide-react-native";
+import { CheckCircle, Eye, Pencil, Plus, Printer, Search, Share2, Wrench } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { useAvisos } from "../../componentes/ui/Avisos";
 import { Botao } from "../../componentes/ui/Botao";
@@ -18,8 +18,9 @@ import { api } from "../../lib/api";
 import { chaves } from "../../lib/consultas";
 import { dataCurta, moeda } from "../../lib/formato";
 import { colunas, useLarguraConteudo } from "../../lib/layout";
+import { imprimirNotaOs } from "../../lib/nota-os";
 import { OrdemServico, statusOrdemServico } from "../../lib/tipos";
-import { abrirWhatsApp } from "../../lib/whatsapp";
+import { compartilharOsWhatsApp } from "../../lib/whatsapp";
 import { useTema } from "../../tema/TemaProvider";
 import { espaco, fonte, raio } from "../../tema/tokens";
 
@@ -123,7 +124,6 @@ export default function TelaOrdensServico() {
       setSelecionada(atualizada);
       setStatusEdicao(atualizada.status);
       avisar({ titulo: "Ordem atualizada", descricao: "O status do conserto foi salvo." });
-      await abrirWhatsApp(atualizada.whatsApp);
     } catch (erro) {
       avisar({
         titulo: "Erro ao atualizar ordem",
@@ -134,62 +134,34 @@ export default function TelaOrdensServico() {
   }
 
   async function imprimir(ordem: OrdemServico) {
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="UTF-8" /><title>Ordem de Serviço - ${ordem.numero}</title>
-<style>
-  body { font-family: Arial, sans-serif; padding: 20px; }
-  .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-  .info { margin: 10px 0; }
-  .label { font-weight: bold; display: inline-block; width: 160px; }
-  .section { margin-top: 20px; }
-  .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ccc; }
-</style></head>
-<body>
-  <div class="header"><h1>BRINKPDV</h1><h2>ORDEM DE SERVIÇO</h2><h3>${ordem.numero}</h3></div>
-  <div class="section">
-    <div class="info"><span class="label">Cliente:</span> ${ordem.cliente}</div>
-    <div class="info"><span class="label">Contato:</span> ${ordem.contatoCliente || "-"}</div>
-    <div class="info"><span class="label">Entrada:</span> ${dataCurta(ordem.data)}</div>
-    <div class="info"><span class="label">Prazo:</span> ${dataCurta(ordem.prazo)}</div>
-  </div>
-  <div class="section">
-    <div class="info"><span class="label">Tipo:</span> ${ordem.tipoAparelho || "-"}</div>
-    <div class="info"><span class="label">Aparelho:</span> ${ordem.aparelho}</div>
-    <div class="info"><span class="label">Estado físico:</span> ${ordem.estadoAparelho || "-"}</div>
-    <div class="info"><span class="label">Defeito:</span> ${ordem.problema}</div>
-  </div>
-  <div class="section">
-    <div class="info"><span class="label">Status:</span> ${ordem.status}</div>
-    <div class="info"><span class="label">Prioridade:</span> ${ordem.prioridade}</div>
-    <div class="info"><span class="label">Valor:</span> ${moeda(ordem.valor)}</div>
-    ${ordem.dataSaida ? `<div class="info"><span class="label">Data de Saída:</span> ${dataCurta(ordem.dataSaida)}</div>` : ""}
-  </div>
-  <div class="footer"><p>_________________________________</p><p>Assinatura do Cliente</p></div>
-</body></html>`;
+    const impresso = await imprimirNotaOs(ordem);
 
-    if (Platform.OS === "web") {
-      const janela = window.open("", "_blank");
-
-      if (janela) {
-        janela.document.write(html);
-        janela.document.close();
-        janela.focus();
-        janela.print();
-      }
-
-      return;
+    if (!impresso) {
+      avisar({
+        titulo: "Impressão bloqueada",
+        descricao: "O navegador impediu a janela de impressão. Autorize pop-ups e tente de novo.",
+        variante: "perigo",
+      });
     }
+  }
 
-    const { printAsync } = await import("expo-print");
-    await printAsync({ html });
+  async function compartilhar(ordem: OrdemServico) {
+    try {
+      await compartilharOsWhatsApp(ordem);
+    } catch (erro) {
+      avisar({
+        titulo: "Não foi possível abrir o WhatsApp",
+        descricao: erro instanceof Error ? erro.message : "Verifique o telefone do cliente.",
+        variante: "perigo",
+      });
+    }
   }
 
   return (
     <View style={{ gap: espaco.xl }}>
       <TituloPagina
         titulo="Ordens de Serviço"
-        descricao="Consulta e atualização do conserto"
+        descricao="Consulta, edição e compartilhamento da OS"
         acoes={
           <Botao
             testID="button-new-service-order"
@@ -269,7 +241,7 @@ export default function TelaOrdensServico() {
               </View>
             ) : (
               <View style={{ paddingHorizontal: espaco.lg }}>
-                <Tabela larguraMinima={ehDesktop ? 1000 : 900}>
+                <Tabela larguraMinima={ehDesktop ? 1180 : 1040}>
                   <LinhaTabela cabecalho>
                     <CelulaTabela cabecalho proporcao={1.2}>
                       OS
@@ -298,7 +270,7 @@ export default function TelaOrdensServico() {
                     <CelulaTabela cabecalho proporcao={1.2}>
                       Saída
                     </CelulaTabela>
-                    <CelulaTabela cabecalho proporcao={1.4} alinhamento="flex-end">
+                    <CelulaTabela cabecalho proporcao={2} alinhamento="flex-end">
                       Ações
                     </CelulaTabela>
                   </LinhaTabela>
@@ -335,8 +307,8 @@ export default function TelaOrdensServico() {
                           <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>—</Text>
                         )}
                       </CelulaTabela>
-                      <CelulaTabela proporcao={1.4} alinhamento="flex-end">
-                        <View style={{ flexDirection: "row", gap: espaco.xs }}>
+                      <CelulaTabela proporcao={2} alinhamento="flex-end">
+                        <View style={{ flexDirection: "row", gap: espaco.xs, flexWrap: "wrap", justifyContent: "flex-end" }}>
                           <Botao
                             testID={`button-view-${ordem.id}`}
                             variante="fantasma"
@@ -347,6 +319,20 @@ export default function TelaOrdensServico() {
                               setDialogoDetalhes(true);
                             }}
                             icone={<Eye size={16} color={cores.texto} />}
+                          />
+                          <Botao
+                            testID={`button-edit-${ordem.id}`}
+                            variante="fantasma"
+                            tamanho="icone"
+                            onPress={() => roteador.push(`/service-orders/new?id=${ordem.id}`)}
+                            icone={<Pencil size={16} color={cores.texto} />}
+                          />
+                          <Botao
+                            testID={`button-share-${ordem.id}`}
+                            variante="fantasma"
+                            tamanho="icone"
+                            onPress={() => compartilhar(ordem)}
+                            icone={<Share2 size={16} color={cores.texto} />}
                           />
                           {!estaEncerrada(ordem.status) ? (
                             <Botao
@@ -388,11 +374,32 @@ export default function TelaOrdensServico() {
         aberto={dialogoDetalhes}
         onFechar={() => setDialogoDetalhes(false)}
         titulo="Detalhes da Ordem de Serviço"
-        descricao="Atualize o estado do conserto — o cliente é avisado no WhatsApp"
+        descricao="Atualize o estado do conserto. Use Compartilhar para abrir o WhatsApp com a mensagem pronta."
         testID="dialog-service-order-details"
         rodape={
           <>
             <Botao variante="contorno" titulo="Fechar" onPress={() => setDialogoDetalhes(false)} />
+            {selecionada ? (
+              <Botao
+                testID="button-edit-details"
+                variante="contorno"
+                titulo="Editar"
+                icone={<Pencil size={16} color={cores.texto} />}
+                onPress={() => {
+                  setDialogoDetalhes(false);
+                  roteador.push(`/service-orders/new?id=${selecionada.id}`);
+                }}
+              />
+            ) : null}
+            {selecionada ? (
+              <Botao
+                testID="button-share-details"
+                variante="contorno"
+                titulo="Compartilhar"
+                icone={<Share2 size={16} color={cores.texto} />}
+                onPress={() => compartilhar(selecionada)}
+              />
+            ) : null}
             {selecionada ? (
               <Botao
                 testID="button-update-order-status"

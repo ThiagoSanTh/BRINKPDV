@@ -4,7 +4,8 @@ import { moeda } from "./formato";
 import { ConfiguracaoLoja, Venda } from "./tipos";
 
 function larguraPapel(configuracao?: ConfiguracaoLoja | null) {
-  return configuracao?.impressoraLarguraPapel === "58mm" ? "220px" : "300px";
+  const valor = configuracao?.impressoraLarguraPapel ?? "";
+  return valor === "58mm" || valor === "58" ? "220px" : "300px";
 }
 
 export function montarHtmlComprovante(venda: Venda, configuracao?: ConfiguracaoLoja | null) {
@@ -85,16 +86,17 @@ export async function imprimirComprovante(venda: Venda, configuracao?: Configura
     const janela = window.open("", "_blank", "width=380,height=640");
 
     if (!janela) {
-      return;
+      return false;
     }
 
     janela.document.write(html);
     janela.document.close();
     janela.focus();
     janela.print();
-    return;
+    return true;
   }
 
   const { printAsync } = await import("expo-print");
   await printAsync({ html });
+  return true;
 }
