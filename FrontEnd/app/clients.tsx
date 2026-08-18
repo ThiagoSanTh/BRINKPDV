@@ -142,7 +142,7 @@ export default function TelaClientes() {
                     <CelulaTabela cabecalho proporcao={1.6}>
                       Observações
                     </CelulaTabela>
-                    <CelulaTabela cabecalho proporcao={1.6} alinhamento="flex-end">
+                    <CelulaTabela cabecalho proporcao={1.6}>
                       Ações
                     </CelulaTabela>
                   </LinhaTabela>
@@ -154,8 +154,8 @@ export default function TelaClientes() {
                       </CelulaTabela>
                       <CelulaTabela proporcao={1.4}>{cliente.telefone}</CelulaTabela>
                       <CelulaTabela proporcao={1.6}>{cliente.observacoes ?? "—"}</CelulaTabela>
-                      <CelulaTabela proporcao={1.6} alinhamento="flex-end">
-                        <View style={{ flexDirection: "row", gap: espaco.xs }}>
+                      <CelulaTabela proporcao={1.6}>
+                        <View style={{ flexDirection: "row", gap: espaco.xs, justifyContent: "center" }}>
                           <Botao
                             testID={`button-history-${cliente.id}`}
                             variante="fantasma"
