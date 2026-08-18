@@ -11,16 +11,13 @@ public class ServicoOrdemServico : IServicoOrdemServico
 {
     private readonly IRepositorioOrdemServico _repositorio;
     private readonly IRepositorioCliente _repositorioCliente;
-    private readonly IServicoWhatsApp _whatsApp;
 
     public ServicoOrdemServico(
         IRepositorioOrdemServico repositorio,
-        IRepositorioCliente repositorioCliente,
-        IServicoWhatsApp whatsApp)
+        IRepositorioCliente repositorioCliente)
     {
         _repositorio = repositorio;
         _repositorioCliente = repositorioCliente;
-        _whatsApp = whatsApp;
     }
 
     public async Task<IReadOnlyList<OrdemServicoDto>> ListarAsync(
@@ -87,8 +84,7 @@ public class ServicoOrdemServico : IServicoOrdemServico
         };
 
         var criada = await _repositorio.CriarAsync(ordem, cancelamento);
-        var whatsapp = await _whatsApp.NotificarAsync(criada, "criacao", cancelamento);
-        return criada.ParaDto(whatsapp);
+        return criada.ParaDto();
     }
 
     public async Task<OrdemServicoDto?> AtualizarAsync(
@@ -134,13 +130,12 @@ public class ServicoOrdemServico : IServicoOrdemServico
             : entrada.DataSaida;
 
         var atualizada = await _repositorio.AtualizarAsync(existente, cancelamento);
-        if (atualizada is null)
-        {
-            return null;
-        }
+        return atualizada?.ParaDto();
+    }
 
-        var whatsapp = await _whatsApp.NotificarAsync(atualizada, "atualizacao", cancelamento);
-        return atualizada.ParaDto(whatsapp);
+    public async Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default)
+    {
+        return await _repositorio.RemoverAsync(id, cancelamento);
     }
 
     private async Task<Cliente> ResolverClienteAsync(
@@ -148,6 +143,55 @@ public class ServicoOrdemServico : IServicoOrdemServico
         CancellationToken cancelamento,
         OrdemServico? existente = null)
     {
+        var nome = (entrada.Cliente ?? existente?.Cliente ?? string.Empty).Trim();
+        var telefone = TelefoneCliente.SomenteDigitos(entrada.ContatoCliente ?? existente?.ContatoCliente);
+        var temDadosCliente = !string.IsNullOrWhiteSpace(entrada.Cliente)
+            || !string.IsNullOrWhiteSpace(entrada.ContatoCliente);
+
+        if (temDadosCliente)
+        {
+            if (string.IsNullOrWhiteSpace(nome) || !TelefoneCliente.EhValido(telefone))
+            {
+                throw new RegraNegocioException("Informe o cliente da ordem de serviço com um telefone válido.");
+            }
+
+            var porTelefone = await _repositorioCliente.ObterPorTelefoneAsync(telefone, cancelamento);
+            if (porTelefone is not null)
+            {
+                if (!string.Equals(porTelefone.Nome, nome, StringComparison.OrdinalIgnoreCase))
+                {
+                    porTelefone.Nome = nome;
+                    await _repositorioCliente.AtualizarAsync(porTelefone, cancelamento);
+                }
+
+                return porTelefone;
+            }
+
+            var vinculadoId = !string.IsNullOrWhiteSpace(entrada.ClienteId)
+                ? entrada.ClienteId
+                : existente?.ClienteId;
+
+            if (!string.IsNullOrWhiteSpace(vinculadoId))
+            {
+                var vinculado = await _repositorioCliente.ObterPorIdAsync(vinculadoId, cancelamento);
+                if (vinculado is not null)
+                {
+                    vinculado.Nome = nome;
+                    vinculado.Telefone = telefone;
+                    await _repositorioCliente.AtualizarAsync(vinculado, cancelamento);
+                    return vinculado;
+                }
+            }
+
+            return await _repositorioCliente.CriarAsync(
+                new Cliente
+                {
+                    Nome = nome,
+                    Telefone = telefone,
+                },
+                cancelamento);
+        }
+
         if (!string.IsNullOrWhiteSpace(entrada.ClienteId))
         {
             var cadastrado = await _repositorioCliente.ObterPorIdAsync(entrada.ClienteId, cancelamento);
@@ -168,33 +212,7 @@ public class ServicoOrdemServico : IServicoOrdemServico
             }
         }
 
-        var nome = (entrada.Cliente ?? existente?.Cliente ?? string.Empty).Trim();
-        var telefone = TelefoneCliente.SomenteDigitos(entrada.ContatoCliente ?? existente?.ContatoCliente);
-
-        if (string.IsNullOrWhiteSpace(nome) || !TelefoneCliente.EhValido(telefone))
-        {
-            throw new RegraNegocioException("Informe o cliente da ordem de serviço com um telefone válido.");
-        }
-
-        var porTelefone = await _repositorioCliente.ObterPorTelefoneAsync(telefone, cancelamento);
-        if (porTelefone is not null)
-        {
-            if (!string.Equals(porTelefone.Nome, nome, StringComparison.OrdinalIgnoreCase))
-            {
-                porTelefone.Nome = nome;
-                await _repositorioCliente.AtualizarAsync(porTelefone, cancelamento);
-            }
-
-            return porTelefone;
-        }
-
-        return await _repositorioCliente.CriarAsync(
-            new Cliente
-            {
-                Nome = nome,
-                Telefone = telefone,
-            },
-            cancelamento);
+        throw new RegraNegocioException("Informe o cliente da ordem de serviço com um telefone válido.");
     }
 
     private static void Validar(OrdemServicoEntradaDto entrada, bool atualizacao = false)

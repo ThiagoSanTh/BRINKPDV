@@ -57,6 +57,8 @@ public interface IServicoOrdemServico
     Task<OrdemServicoDto> CriarAsync(OrdemServicoEntradaDto entrada, CancellationToken cancelamento = default);
 
     Task<OrdemServicoDto?> AtualizarAsync(string id, OrdemServicoEntradaDto entrada, CancellationToken cancelamento = default);
+
+    Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default);
 }
 
 public interface IServicoCliente

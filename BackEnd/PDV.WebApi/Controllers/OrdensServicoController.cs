@@ -50,4 +50,11 @@ public class OrdensServicoController : ControllerBase
         var ordem = await _servico.AtualizarAsync(id, entrada, cancelamento);
         return ordem is null ? NotFound(new { mensagem = "Ordem de serviço não encontrada." }) : Ok(ordem);
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Remover(string id, CancellationToken cancelamento)
+    {
+        var removido = await _servico.RemoverAsync(id, cancelamento);
+        return removido ? NoContent() : NotFound(new { mensagem = "Ordem de serviço não encontrada." });
+    }
 }

@@ -158,7 +158,17 @@ export default function TelaPdv() {
         })),
       });
 
-      await imprimirComprovante(venda, configuracao);
+      if (configuracao?.impressaoAutomatica !== false) {
+        const impresso = await imprimirComprovante(venda, configuracao);
+
+        if (!impresso) {
+          avisar({
+            titulo: "Impressão bloqueada",
+            descricao: "O navegador impediu a janela de impressão. Autorize pop-ups ou reimprima em Vendas do Dia.",
+            variante: "perigo",
+          });
+        }
+      }
 
       setCarrinho([]);
       setDialogoPagamento(false);
@@ -555,7 +565,7 @@ export default function TelaPdv() {
             />
             <Botao
               testID="button-confirm-payment"
-              titulo="Confirmar e Imprimir"
+              titulo={configuracao?.impressaoAutomatica === false ? "Confirmar" : "Confirmar e Imprimir"}
               carregando={registrarVenda.isPending}
               desabilitado={formaPagamento === "Dinheiro" && (!valorRecebido || paraNumero(valorRecebido) < total)}
               onPress={finalizar}

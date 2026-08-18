@@ -43,60 +43,6 @@ public static class InicializadorBanco
             }
         }
 
-        if (!await contexto.Vendedores.AnyAsync(cancelamento))
-        {
-            contexto.Vendedores.Add(new Vendedor
-            {
-                Id = "vendedor-padrao",
-                Nome = "Vendedor Padrão",
-                Email = "vendedor@brinkpdv.local",
-                Telefone = "(00) 00000-0000",
-                Comissao = 5m,
-                Ativo = true,
-            });
-        }
-
-        if (!await contexto.Produtos.AnyAsync(cancelamento))
-        {
-            contexto.Produtos.AddRange(
-                new Produto
-                {
-                    Sku = "SKU-001",
-                    Nome = "Café Especial",
-                    Categoria = "Bebidas",
-                    Preco = 12.90m,
-                    PrecoCusto = 6.50m,
-                    Estoque = 25,
-                },
-                new Produto
-                {
-                    Sku = "SKU-002",
-                    Nome = "Sanduíche Artesanal",
-                    Categoria = "Lanches",
-                    Preco = 24.50m,
-                    PrecoCusto = 11.00m,
-                    Estoque = 15,
-                },
-                new Produto
-                {
-                    Sku = "SKU-003",
-                    Nome = "Pão de Queijo",
-                    Categoria = "Padaria",
-                    Preco = 6.90m,
-                    PrecoCusto = 2.80m,
-                    Estoque = 40,
-                },
-                new Produto
-                {
-                    Sku = "CEL-001",
-                    Nome = "Capa de Celular iPhone 15",
-                    Categoria = "Acessórios",
-                    Preco = 49.90m,
-                    PrecoCusto = 18.00m,
-                    Estoque = 30,
-                });
-        }
-
         if (!await contexto.ConfiguracoesLoja.AnyAsync(cancelamento))
         {
             contexto.ConfiguracoesLoja.Add(new ConfiguracaoLoja

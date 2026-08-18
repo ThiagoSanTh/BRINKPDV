@@ -647,8 +647,9 @@ export default function TelaConfiguracoes() {
           </View>
 
           <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
-            Com token e Phone Number Id da API Cloud da Meta, o aviso da OS é enviado automaticamente. Sem
-            esses dados, o sistema abre o WhatsApp com a mensagem pronta para o atendente confirmar.
+            O sistema não envia WhatsApp sozinho. Use o botão Compartilhar na OS para abrir o WhatsApp
+            com a mensagem pronta — o atendente pode editar o texto antes de enviar. Token e Phone Number
+            Id da Meta são opcionais e ficam só como referência da oficina.
           </Text>
 
           <View style={{ gap: espaco.sm }}>
