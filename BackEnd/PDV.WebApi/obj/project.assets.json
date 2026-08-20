@@ -2966,7 +2966,7 @@
     ]
   },
   "packageFolders": {
-    "/home/thsanth/.nuget/packages/": {}
+    "/tmp/cursor-sandbox-cache/250e9b94bf1533904f7ede9a596afdfe/nuget": {}
   },
   "project": {
     "version": "1.0.0",
@@ -2974,7 +2974,7 @@
       "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.WebApi/PDV.WebApi.csproj",
       "projectName": "PDV.WebApi",
       "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.WebApi/PDV.WebApi.csproj",
-      "packagesPath": "/home/thsanth/.nuget/packages/",
+      "packagesPath": "/tmp/cursor-sandbox-cache/250e9b94bf1533904f7ede9a596afdfe/nuget",
       "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.WebApi/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [

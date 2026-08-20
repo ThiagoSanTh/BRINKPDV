@@ -19,7 +19,7 @@ import { chaves } from "../../lib/consultas";
 import { dataCurta, moeda } from "../../lib/formato";
 import { colunas, useLarguraConteudo } from "../../lib/layout";
 import { imprimirNotaOs } from "../../lib/nota-os";
-import { OrdemServico, statusOrdemServico } from "../../lib/tipos";
+import { ConfiguracaoLoja, OrdemServico, statusOrdemServico } from "../../lib/tipos";
 import { compartilharOsWhatsApp } from "../../lib/whatsapp";
 import { useTema } from "../../tema/TemaProvider";
 import { espaco, fonte, raio } from "../../tema/tokens";
@@ -78,6 +78,7 @@ export default function TelaOrdensServico() {
   const [statusEdicao, setStatusEdicao] = useState<string>("Orçamento");
 
   const { data: ordens = [], isLoading } = useQuery<OrdemServico[]>({ queryKey: chaves.ordensServico });
+  const { data: configuracao } = useQuery<ConfiguracaoLoja>({ queryKey: chaves.configuracaoLoja });
 
   function invalidar() {
     clienteConsultas.invalidateQueries({ queryKey: chaves.ordensServico });
@@ -134,7 +135,7 @@ export default function TelaOrdensServico() {
   }
 
   async function imprimir(ordem: OrdemServico) {
-    const impresso = await imprimirNotaOs(ordem);
+    const impresso = await imprimirNotaOs(ordem, configuracao);
 
     if (!impresso) {
       avisar({

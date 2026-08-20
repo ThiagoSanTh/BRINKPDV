@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PDV.Dominio.Entidades;
 using PDV.Servico.Dtos;
 using PDV.Servico.Interfaces;
 
 namespace PDV.WebApi.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = FuncoesUsuario.PapeisClientes)]
 [Route("api/clientes")]
 public class ClientesController : ControllerBase
 {
@@ -33,6 +34,7 @@ public class ClientesController : ControllerBase
     }
 
     [HttpGet("{id}/ordens")]
+    [Authorize(Roles = FuncoesUsuario.PapeisOficina)]
     public async Task<ActionResult<IReadOnlyList<OrdemServicoDto>>> Historico(string id, CancellationToken cancelamento)
     {
         var cliente = await _servico.ObterAsync(id, cancelamento);

@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PDV.Dominio.Entidades;
 using PDV.Servico.Dtos;
 using PDV.Servico.Interfaces;
 
 namespace PDV.WebApi.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = FuncoesUsuario.PapeisOficina)]
 [Route("api/ordens-servico")]
 public class OrdensServicoController : ControllerBase
 {

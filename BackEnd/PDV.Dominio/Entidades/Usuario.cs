@@ -27,4 +27,37 @@ public static class FuncoesUsuario
     ];
 
     public static bool EhValida(string funcao) => Todas.Contains(funcao);
+
+    public const string PapeisGestao = "Administrador,Gerente";
+    public const string PapeisVendas = "Administrador,Gerente,Vendedor";
+    public const string PapeisOficina = "Administrador,Gerente,Técnico";
+    public const string PapeisClientes = "Administrador,Gerente,Vendedor,Técnico";
+
+    public static bool EhGestao(string? funcao) =>
+        funcao is Administrador or Gerente;
+
+    public static bool PodeCriarFuncao(string ator, string alvo)
+    {
+        if (!EhValida(alvo))
+        {
+            return false;
+        }
+
+        if (ator == Administrador)
+        {
+            return true;
+        }
+
+        return ator == Gerente && alvo is Vendedor or Tecnico;
+    }
+
+    public static bool PodeGerenciarUsuario(string ator, string funcaoAlvo)
+    {
+        if (ator == Administrador)
+        {
+            return true;
+        }
+
+        return ator == Gerente && funcaoAlvo is Vendedor or Tecnico;
+    }
 }

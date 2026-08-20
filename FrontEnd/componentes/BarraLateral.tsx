@@ -12,6 +12,8 @@ import {
 } from "lucide-react-native";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 
+import { useAutenticacao } from "../lib/autenticacao";
+import { podeAcessarRota } from "../lib/permissoes";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, larguraBarraLateral, raio } from "../tema/tokens";
 
@@ -38,6 +40,8 @@ export function BarraLateral({
 }) {
   const { cores } = useTema();
   const router = useRouter();
+  const { usuario } = useAutenticacao();
+  const visiveis = itensMenu.filter((item) => podeAcessarRota(usuario?.funcao, item.rota));
 
   return (
     <View
@@ -102,7 +106,7 @@ export function BarraLateral({
           Menu Principal
         </Text>
 
-        {itensMenu.map((item) => {
+        {visiveis.map((item) => {
           const ativo =
             item.rota === "/"
               ? rotaAtual === "/"

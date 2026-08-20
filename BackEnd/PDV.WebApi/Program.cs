@@ -43,6 +43,8 @@ builder.Services
             ValidIssuer = opcoesJwt.Emissor,
             ValidAudience = opcoesJwt.Audiencia,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(opcoesJwt.Chave)),
+            RoleClaimType = System.Security.Claims.ClaimTypes.Role,
+            NameClaimType = System.Security.Claims.ClaimTypes.NameIdentifier,
         };
     });
 

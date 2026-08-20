@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PDV.Dominio.Entidades;
 using PDV.Servico.Dtos;
 using PDV.Servico.Interfaces;
 
@@ -24,7 +25,7 @@ public class ConfiguracaoLojaController : ControllerBase
     }
 
     [HttpPut]
-    [Authorize]
+    [Authorize(Roles = FuncoesUsuario.PapeisGestao)]
     public async Task<ActionResult<ConfiguracaoLojaDto>> Salvar(ConfiguracaoLojaDto entrada, CancellationToken cancelamento)
     {
         return Ok(await _servico.SalvarAsync(entrada, cancelamento));

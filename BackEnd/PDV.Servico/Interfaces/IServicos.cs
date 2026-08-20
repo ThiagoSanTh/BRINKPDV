@@ -90,11 +90,11 @@ public interface IServicoUsuario
 {
     Task<IReadOnlyList<UsuarioDto>> ListarAsync(CancellationToken cancelamento = default);
 
-    Task<UsuarioDto> CriarAsync(UsuarioEntradaDto entrada, CancellationToken cancelamento = default);
+    Task<UsuarioDto> CriarAsync(UsuarioEntradaDto entrada, AtorUsuario ator, CancellationToken cancelamento = default);
 
-    Task<UsuarioDto?> AtualizarAsync(string id, UsuarioEntradaDto entrada, CancellationToken cancelamento = default);
+    Task<UsuarioDto?> AtualizarAsync(string id, UsuarioEntradaDto entrada, AtorUsuario ator, CancellationToken cancelamento = default);
 
-    Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default);
+    Task<bool> RemoverAsync(string id, AtorUsuario ator, CancellationToken cancelamento = default);
 
     Task<UsuarioDto?> AutenticarAsync(CredenciaisDto credenciais, CancellationToken cancelamento = default);
 }

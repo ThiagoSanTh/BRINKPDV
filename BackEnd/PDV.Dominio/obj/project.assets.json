@@ -8,7 +8,7 @@
     "net8.0": []
   },
   "packageFolders": {
-    "/home/thsanth/.nuget/packages/": {}
+    "/tmp/cursor-sandbox-cache/250e9b94bf1533904f7ede9a596afdfe/nuget": {}
   },
   "project": {
     "version": "1.0.0",
@@ -16,7 +16,7 @@
       "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj",
       "projectName": "PDV.Dominio",
       "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj",
-      "packagesPath": "/home/thsanth/.nuget/packages/",
+      "packagesPath": "/tmp/cursor-sandbox-cache/250e9b94bf1533904f7ede9a596afdfe/nuget",
       "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [

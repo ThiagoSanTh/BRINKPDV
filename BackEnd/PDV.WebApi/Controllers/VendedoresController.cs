@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PDV.Dominio.Entidades;
 using PDV.Servico.Dtos;
 using PDV.Servico.Interfaces;
 
 namespace PDV.WebApi.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = FuncoesUsuario.PapeisVendas)]
 [Route("api/vendedores")]
 public class VendedoresController : ControllerBase
 {
@@ -31,6 +32,7 @@ public class VendedoresController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = FuncoesUsuario.PapeisGestao)]
     public async Task<ActionResult<VendedorDto>> Criar(VendedorEntradaDto entrada, CancellationToken cancelamento)
     {
         var vendedor = await _servico.CriarAsync(entrada, cancelamento);
@@ -38,6 +40,7 @@ public class VendedoresController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = FuncoesUsuario.PapeisGestao)]
     public async Task<ActionResult<VendedorDto>> Atualizar(string id, VendedorEntradaDto entrada, CancellationToken cancelamento)
     {
         var vendedor = await _servico.AtualizarAsync(id, entrada, cancelamento);
@@ -45,6 +48,7 @@ public class VendedoresController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = FuncoesUsuario.PapeisGestao)]
     public async Task<IActionResult> Remover(string id, CancellationToken cancelamento)
     {
         var removido = await _servico.RemoverAsync(id, cancelamento);

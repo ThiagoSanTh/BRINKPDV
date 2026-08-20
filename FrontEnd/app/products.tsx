@@ -16,7 +16,7 @@ import { api } from "../lib/api";
 import { chaves } from "../lib/consultas";
 import { moeda, paraNumero } from "../lib/formato";
 import { colunas, useLarguraConteudo } from "../lib/layout";
-import { Produto } from "../lib/tipos";
+import { Produto, ConfiguracaoLoja } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
 
@@ -54,6 +54,7 @@ export default function TelaProdutos() {
   const [formulario, setFormulario] = useState<Formulario>(formularioVazio);
 
   const { data: produtos = [] } = useQuery<Produto[]>({ queryKey: chaves.produtos });
+  const { data: configuracao } = useQuery<ConfiguracaoLoja>({ queryKey: chaves.configuracaoLoja });
 
   function invalidar() {
     clienteConsultas.invalidateQueries({ queryKey: chaves.produtos });
@@ -415,7 +416,7 @@ export default function TelaProdutos() {
                         )}
                       </CelulaTabela>
                       <CelulaTabela proporcao={1}>
-                        {produto.estoque < 10 ? (
+                        {configuracao?.alertaEstoqueBaixo !== false && produto.estoque < 10 ? (
                           <Selo texto={String(produto.estoque)} variante="perigo" />
                         ) : (
                           <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "500" }}>

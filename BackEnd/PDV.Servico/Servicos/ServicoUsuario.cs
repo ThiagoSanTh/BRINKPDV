@@ -9,6 +9,7 @@ namespace PDV.Servico.Servicos;
 
 public class ServicoUsuario : IServicoUsuario
 {
+    private const int SenhaMinima = 8;
     private readonly IRepositorioUsuario _repositorio;
 
     public ServicoUsuario(IRepositorioUsuario repositorio)
@@ -22,16 +23,19 @@ public class ServicoUsuario : IServicoUsuario
         return usuarios.Select(usuario => usuario.ParaDto()).ToList();
     }
 
-    public async Task<UsuarioDto> CriarAsync(UsuarioEntradaDto entrada, CancellationToken cancelamento = default)
+    public async Task<UsuarioDto> CriarAsync(
+        UsuarioEntradaDto entrada,
+        AtorUsuario ator,
+        CancellationToken cancelamento = default)
     {
         if (string.IsNullOrWhiteSpace(entrada.NomeUsuario))
         {
             throw new RegraNegocioException("Informe o nome de usuário.");
         }
 
-        if (string.IsNullOrWhiteSpace(entrada.Senha))
+        if (string.IsNullOrWhiteSpace(entrada.Senha) || entrada.Senha.Length < SenhaMinima)
         {
-            throw new RegraNegocioException("Informe a senha do usuário.");
+            throw new RegraNegocioException("A senha deve ter no mínimo 8 caracteres.");
         }
 
         var funcao = string.IsNullOrWhiteSpace(entrada.Funcao) ? FuncoesUsuario.Vendedor : entrada.Funcao;
@@ -39,6 +43,11 @@ public class ServicoUsuario : IServicoUsuario
         if (!FuncoesUsuario.EhValida(funcao))
         {
             throw new RegraNegocioException($"Função inválida: {funcao}.");
+        }
+
+        if (!FuncoesUsuario.PodeCriarFuncao(ator.Funcao, funcao))
+        {
+            throw new RegraNegocioException($"Você não pode criar usuários com a função {funcao}.");
         }
 
         var existente = await _repositorio.ObterPorNomeUsuarioAsync(entrada.NomeUsuario.Trim(), cancelamento);
@@ -62,7 +71,11 @@ public class ServicoUsuario : IServicoUsuario
         return criado.ParaDto();
     }
 
-    public async Task<UsuarioDto?> AtualizarAsync(string id, UsuarioEntradaDto entrada, CancellationToken cancelamento = default)
+    public async Task<UsuarioDto?> AtualizarAsync(
+        string id,
+        UsuarioEntradaDto entrada,
+        AtorUsuario ator,
+        CancellationToken cancelamento = default)
     {
         var existente = await _repositorio.ObterPorIdAsync(id, cancelamento);
 
@@ -76,6 +89,7 @@ public class ServicoUsuario : IServicoUsuario
             throw new RegraNegocioException("Informe o nome de usuário.");
         }
 
+        var ehProprio = string.Equals(existente.Id, ator.Id, StringComparison.Ordinal);
         var funcao = string.IsNullOrWhiteSpace(entrada.Funcao) ? existente.Funcao : entrada.Funcao;
 
         if (!FuncoesUsuario.EhValida(funcao))
@@ -83,10 +97,25 @@ public class ServicoUsuario : IServicoUsuario
             throw new RegraNegocioException($"Função inválida: {funcao}.");
         }
 
+        if (ehProprio)
+        {
+            funcao = existente.Funcao;
+        }
+        else if (!FuncoesUsuario.PodeGerenciarUsuario(ator.Funcao, existente.Funcao)
+                 || !FuncoesUsuario.PodeCriarFuncao(ator.Funcao, funcao))
+        {
+            throw new RegraNegocioException("Você não pode alterar este usuário.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(entrada.Senha) && entrada.Senha.Length < SenhaMinima)
+        {
+            throw new RegraNegocioException("A senha deve ter no mínimo 8 caracteres.");
+        }
+
         existente.NomeUsuario = entrada.NomeUsuario.Trim();
         existente.Email = string.IsNullOrWhiteSpace(entrada.Email) ? null : entrada.Email.Trim();
         existente.Funcao = funcao;
-        existente.Ativo = entrada.Ativo;
+        existente.Ativo = ehProprio ? existente.Ativo : entrada.Ativo;
 
         if (!string.IsNullOrWhiteSpace(entrada.Senha))
         {
@@ -97,7 +126,7 @@ public class ServicoUsuario : IServicoUsuario
         return atualizado?.ParaDto();
     }
 
-    public async Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default)
+    public async Task<bool> RemoverAsync(string id, AtorUsuario ator, CancellationToken cancelamento = default)
     {
         var existente = await _repositorio.ObterPorIdAsync(id, cancelamento);
 
@@ -106,9 +135,19 @@ public class ServicoUsuario : IServicoUsuario
             return false;
         }
 
+        if (string.Equals(existente.Id, ator.Id, StringComparison.Ordinal))
+        {
+            throw new RegraNegocioException("Você não pode remover o próprio usuário.");
+        }
+
         if (existente.NomeUsuario == "admin")
         {
             throw new RegraNegocioException("O usuário admin não pode ser removido.");
+        }
+
+        if (!FuncoesUsuario.PodeGerenciarUsuario(ator.Funcao, existente.Funcao))
+        {
+            throw new RegraNegocioException("Você não pode remover este usuário.");
         }
 
         return await _repositorio.RemoverAsync(id, cancelamento);

@@ -13,8 +13,10 @@ import { Selo } from "../componentes/ui/Selo";
 import { CelulaTabela, LinhaTabela, Tabela } from "../componentes/ui/Tabela";
 import { TituloPagina } from "../componentes/ui/TituloPagina";
 import { api } from "../lib/api";
+import { useAutenticacao } from "../lib/autenticacao";
 import { chaves } from "../lib/consultas";
 import { dataCurta } from "../lib/formato";
+import { podeVerOs } from "../lib/permissoes";
 import { Cliente, OrdemServico } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
@@ -22,6 +24,8 @@ import { espaco, fonte, raio } from "../tema/tokens";
 export default function TelaClientes() {
   const { cores, ehDesktop } = useTema();
   const { avisar } = useAvisos();
+  const { usuario } = useAutenticacao();
+  const verOs = podeVerOs(usuario?.funcao);
   const roteador = useRouter();
   const clienteConsultas = useQueryClient();
 
@@ -36,7 +40,7 @@ export default function TelaClientes() {
   const { data: clientes = [], isLoading } = useQuery<Cliente[]>({ queryKey: chaves.clientes });
   const { data: historico = [] } = useQuery<OrdemServico[]>({
     queryKey: selecionado ? chaves.historicoCliente(selecionado.id) : ["historico-vazio"],
-    enabled: Boolean(selecionado) && historicoAberto,
+    enabled: verOs && Boolean(selecionado) && historicoAberto,
   });
 
   const filtrados = useMemo(() => {
@@ -156,6 +160,7 @@ export default function TelaClientes() {
                       <CelulaTabela proporcao={1.6}>{cliente.observacoes ?? "—"}</CelulaTabela>
                       <CelulaTabela proporcao={1.6}>
                         <View style={{ flexDirection: "row", gap: espaco.xs, justifyContent: "center" }}>
+                          {verOs ? (
                           <Botao
                             testID={`button-history-${cliente.id}`}
                             variante="fantasma"
@@ -166,6 +171,7 @@ export default function TelaClientes() {
                             }}
                             icone={<History size={16} color={cores.texto} />}
                           />
+                          ) : null}
                           <Botao
                             testID={`button-edit-client-${cliente.id}`}
                             variante="fantasma"
