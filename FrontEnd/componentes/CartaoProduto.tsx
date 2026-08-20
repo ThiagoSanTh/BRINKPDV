@@ -16,6 +16,7 @@ export function CartaoProduto({
   categoria,
   aoAdicionar,
   largura,
+  alertaEstoqueBaixo = true,
 }: {
   id: string;
   nome: string;
@@ -25,9 +26,10 @@ export function CartaoProduto({
   categoria?: string;
   aoAdicionar?: (id: string) => void;
   largura: number;
+  alertaEstoqueBaixo?: boolean;
 }) {
   const { cores } = useTema();
-  const estoqueBaixo = estoque < 10;
+  const estoqueBaixo = alertaEstoqueBaixo && estoque < 10;
 
   return (
     <Cartao testID={`card-product-${id}`} estilo={{ width: largura, overflow: "hidden" }}>

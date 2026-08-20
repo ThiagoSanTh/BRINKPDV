@@ -19,6 +19,7 @@ import { imprimirComprovante } from "../lib/comprovante";
 import { chaves } from "../lib/consultas";
 import { moeda, paraNumero } from "../lib/formato";
 import { colunas, larguraColuna, useLarguraConteudo } from "../lib/layout";
+import { tocarSomFinalizacao } from "../lib/som";
 import { ConfiguracaoLoja, formasPagamento, Produto, Venda, Vendedor } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte } from "../tema/tokens";
@@ -157,6 +158,10 @@ export default function TelaPdv() {
           desconto: item.desconto,
         })),
       });
+
+      if (configuracao?.somFinalizacao) {
+        tocarSomFinalizacao();
+      }
 
       if (configuracao?.impressaoAutomatica !== false) {
         const impresso = await imprimirComprovante(venda, configuracao);
@@ -331,6 +336,7 @@ export default function TelaPdv() {
                 categoria={produto.categoria}
                 aoAdicionar={adicionar}
                 largura={larguraColuna(larguraLista, colunasProdutos)}
+                alertaEstoqueBaixo={configuracao?.alertaEstoqueBaixo !== false}
               />
             ))}
           </View>
@@ -368,7 +374,7 @@ export default function TelaPdv() {
                       {moeda(produto.preco)}
                     </CelulaTabela>
                     <CelulaTabela proporcao={1} alinhamento="flex-end">
-                      {produto.estoque < 10 ? (
+                      {configuracao?.alertaEstoqueBaixo !== false && produto.estoque < 10 ? (
                         <Selo texto={String(produto.estoque)} variante="perigo" />
                       ) : (
                         <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>

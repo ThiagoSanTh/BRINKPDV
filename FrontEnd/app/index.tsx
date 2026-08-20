@@ -10,6 +10,7 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
+  Wrench,
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -27,7 +28,9 @@ import { api } from "../lib/api";
 import { chaves } from "../lib/consultas";
 import { hora, moeda, paraNumero } from "../lib/formato";
 import { colunas, useLarguraConteudo } from "../lib/layout";
-import { OrdemServico, Produto, ResumoCaixa, Venda } from "../lib/tipos";
+import { useAutenticacao } from "../lib/autenticacao";
+import { podeVerOs, podeVerProdutos, podeVerRelatorios, podeVerVendas } from "../lib/permissoes";
+import { ConfiguracaoLoja, OrdemServico, Produto, ResumoCaixa, Venda } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
 
@@ -36,7 +39,12 @@ export default function TelaDashboard() {
   const router = useRouter();
   const largura = useLarguraConteudo();
   const { avisar } = useAvisos();
+  const { usuario } = useAutenticacao();
   const clienteConsultas = useQueryClient();
+  const verVendas = podeVerVendas(usuario?.funcao);
+  const verProdutos = podeVerProdutos(usuario?.funcao);
+  const verOs = podeVerOs(usuario?.funcao);
+  const verRelatorios = podeVerRelatorios(usuario?.funcao);
 
   const [dialogoEntrada, setDialogoEntrada] = useState(false);
   const [dialogoSaida, setDialogoSaida] = useState(false);
@@ -47,12 +55,21 @@ export default function TelaDashboard() {
 
   const { data: vendas = [], isFetched: vendasCarregadas } = useQuery<Venda[]>({
     queryKey: chaves.vendasHoje,
+    enabled: verVendas,
   });
   const { data: produtos = [], isFetched: produtosCarregados } = useQuery<Produto[]>({
     queryKey: chaves.produtos,
+    enabled: verProdutos,
   });
-  const { data: ordens = [] } = useQuery<OrdemServico[]>({ queryKey: chaves.ordensServico });
-  const { data: caixa } = useQuery<ResumoCaixa>({ queryKey: chaves.caixa });
+  const { data: ordens = [] } = useQuery<OrdemServico[]>({
+    queryKey: chaves.ordensServico,
+    enabled: verOs,
+  });
+  const { data: caixa } = useQuery<ResumoCaixa>({
+    queryKey: chaves.caixa,
+    enabled: verVendas,
+  });
+  const { data: configuracao } = useQuery<ConfiguracaoLoja>({ queryKey: chaves.configuracaoLoja });
 
   const registrarMovimento = useMutation({
     mutationFn: (dados: { tipo: "entrada" | "saida"; valor: number; descricao?: string }) =>
@@ -61,7 +78,11 @@ export default function TelaDashboard() {
   });
 
   const totalVendas = useMemo(() => vendas.reduce((soma, venda) => soma + venda.total, 0), [vendas]);
-  const estoqueBaixo = useMemo(() => produtos.filter((produto) => produto.estoque < 10).length, [produtos]);
+  const alertaEstoque = configuracao?.alertaEstoqueBaixo !== false;
+  const estoqueBaixo = useMemo(
+    () => (alertaEstoque ? produtos.filter((produto) => produto.estoque < 10).length : 0),
+    [produtos, alertaEstoque],
+  );
   const recentes = useMemo(() => vendas.slice(0, 5), [vendas]);
 
   const porFormaPagamento = useMemo(
@@ -146,27 +167,34 @@ export default function TelaDashboard() {
 
       <Grade colunas={colunasIndicadores} largura={largura}>
         {[
+          verVendas ? (
           <Pressable
             key="vendas"
             testID="clickable-card-sales-today"
-            onPress={() => router.push("/reports")}
+            onPress={() => router.push(verRelatorios ? "/reports" : "/daily-sales")}
           >
             <CartaoIndicador titulo="Vendas Hoje" valor={moeda(totalVendas)} icone={DollarSign} />
-          </Pressable>,
+          </Pressable>
+          ) : null,
+          verVendas ? (
           <Pressable key="transacoes" testID="clickable-card-transactions" onPress={() => router.push("/pos")}>
             <CartaoIndicador
               titulo="Transações"
               valor={vendasCarregadas ? String(vendas.length) : "—"}
               icone={ShoppingCart}
             />
-          </Pressable>,
+          </Pressable>
+          ) : null,
+          verProdutos ? (
           <Pressable key="produtos" testID="clickable-card-products" onPress={() => router.push("/products")}>
             <CartaoIndicador
               titulo="Produtos"
               valor={produtosCarregados ? String(produtos.length) : "—"}
               icone={Package}
             />
-          </Pressable>,
+          </Pressable>
+          ) : null,
+          verProdutos && alertaEstoque ? (
           <Pressable
             key="estoque"
             testID="clickable-card-low-stock"
@@ -177,10 +205,22 @@ export default function TelaDashboard() {
               valor={produtosCarregados ? String(estoqueBaixo) : "—"}
               icone={AlertTriangle}
             />
-          </Pressable>,
-        ]}
+          </Pressable>
+          ) : null,
+          verOs ? (
+          <Pressable
+            key="ordens"
+            testID="clickable-card-service-orders"
+            onPress={() => router.push("/service-orders")}
+          >
+            <CartaoIndicador titulo="Ordens de Serviço" valor={String(ordens.length)} icone={Wrench} />
+          </Pressable>
+          ) : null,
+        ].filter(Boolean)}
       </Grade>
 
+      {verVendas ? (
+      <>
       <View style={{ gap: espaco.lg }}>
         <SubTitulo>Vendas por Forma de Pagamento</SubTitulo>
 
@@ -279,8 +319,11 @@ export default function TelaDashboard() {
           </View>
         </Cartao>
       </View>
+      </>
+      ) : null}
 
       <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.xl }}>
+        {verVendas ? (
         <Cartao testID="card-cash-register" estilo={{ flex: 1 }}>
           <View style={{ padding: espaco.xl, gap: espaco.lg }}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
@@ -355,18 +398,22 @@ export default function TelaDashboard() {
             </View>
           </View>
         </Cartao>
+        ) : null}
 
         <Cartao testID="card-quick-actions" estilo={{ flex: 1 }}>
           <View style={{ padding: espaco.xl, gap: espaco.lg }}>
             <Text style={{ color: cores.texto, fontSize: fonte.lg, fontWeight: "600" }}>Ações Rápidas</Text>
 
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.md }}>
+              {verVendas ? (
               <Botao
                 testID="button-new-sale"
                 titulo="Nova Venda"
                 icone={<ShoppingCart size={16} color={cores.primariaTexto} />}
                 onPress={() => router.push("/pos")}
               />
+              ) : null}
+              {verProdutos ? (
               <Botao
                 testID="button-add-product"
                 variante="contorno"
@@ -374,18 +421,23 @@ export default function TelaDashboard() {
                 icone={<Package size={16} color={cores.texto} />}
                 onPress={() => router.push("/products")}
               />
+              ) : null}
+              {verOs ? (
               <Botao
                 testID="button-new-service-order"
                 variante="contorno"
                 titulo="Nova Ordem de Serviço"
                 onPress={() => router.push("/service-orders/new")}
               />
+              ) : null}
+              {verRelatorios ? (
               <Botao
                 testID="button-view-reports"
                 variante="contorno"
                 titulo="Visualizar Relatórios"
                 onPress={() => router.push("/reports")}
               />
+              ) : null}
             </View>
           </View>
         </Cartao>

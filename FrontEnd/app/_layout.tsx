@@ -13,6 +13,7 @@ import { Botao } from "../componentes/ui/Botao";
 import { AutenticacaoProvider, useAutenticacao } from "../lib/autenticacao";
 import { silenciarRuidoDeBiblioteca } from "../lib/avisosConsole";
 import { chaves, clienteConsultas } from "../lib/consultas";
+import { podeAcessarRota } from "../lib/permissoes";
 import { ConfiguracaoLoja } from "../lib/tipos";
 import { TemaProvider, useTema } from "../tema/TemaProvider";
 import { espaco, fonte, larguraBarraLateral, raio } from "../tema/tokens";
@@ -71,6 +72,7 @@ function LayoutAutenticado() {
   const { usuario, sair } = useAutenticacao();
   const { avisar } = useAvisos();
   const caminho = usePathname();
+  const router = useRouter();
   const [gavetaAberta, setGavetaAberta] = useState(false);
 
   const { data: configuracao } = useQuery<ConfiguracaoLoja>({ queryKey: chaves.configuracaoLoja });
@@ -82,6 +84,16 @@ function LayoutAutenticado() {
       setGavetaAberta(false);
     }
   }, [ehDesktop]);
+
+  useEffect(() => {
+    if (!usuario) {
+      return;
+    }
+
+    if (!podeAcessarRota(usuario.funcao, caminho)) {
+      router.replace("/");
+    }
+  }, [usuario, caminho, router]);
 
   return (
     <View style={{ flex: 1, flexDirection: "row", backgroundColor: cores.fundo }}>

@@ -17,6 +17,7 @@ import { useAutenticacao } from "../lib/autenticacao";
 import { chaves } from "../lib/consultas";
 import { moeda } from "../lib/formato";
 import { colunas, useLarguraConteudo } from "../lib/layout";
+import { podeVerRelatorios as podeVerRelatoriosFn } from "../lib/permissoes";
 import { Venda } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
@@ -42,14 +43,17 @@ export default function TelaRelatorios() {
   const roteador = useRouter();
   const { avisar } = useAvisos();
   const { usuario } = useAutenticacao();
-  const podeVerRelatorios = usuario?.funcao === "Administrador" || usuario?.funcao === "Gerente";
+  const podeVerRelatorios = podeVerRelatoriosFn(usuario?.funcao);
 
   const [dialogoPeriodo, setDialogoPeriodo] = useState(false);
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
   const [periodo, setPeriodo] = useState<{ inicio: string; fim: string } | null>(null);
 
-  const { data: vendas = [] } = useQuery<Venda[]>({ queryKey: chaves.vendas });
+  const { data: vendas = [] } = useQuery<Venda[]>({
+    queryKey: chaves.vendas,
+    enabled: podeVerRelatorios,
+  });
 
   const vendasFiltradas = useMemo(() => {
     if (!periodo) {

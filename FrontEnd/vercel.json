@@ -2,10 +2,24 @@
   "buildCommand": "npx expo export -p web",
   "outputDirectory": "dist",
   "framework": null,
+  "cleanUrls": true,
   "headers": [
     {
       "source": "/sw.js",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/loign",
+      "destination": "/login",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/:path((?!_expo|assets|.*\\..*).*)",
+      "destination": "/index.html"
     }
   ]
 }

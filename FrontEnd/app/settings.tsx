@@ -38,9 +38,11 @@ import { baixarTexto, escolherImagemBase64 } from "../lib/arquivos";
 import { useAutenticacao } from "../lib/autenticacao";
 import { chaves } from "../lib/consultas";
 import { colunas, useLarguraConteudo } from "../lib/layout";
-import { ConfiguracaoLoja, Usuario } from "../lib/tipos";
+import { ehGestao, funcoesQuePodeCriar, podeCriarFuncao } from "../lib/permissoes";
+import { Cliente, ConfiguracaoLoja, Usuario } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
+import Constants from "expo-constants";
 
 const urlAtualizacoes =
   "https://drive.google.com/drive/folders/1EExvSO8_jk-TbS4njK44wZYuX5HukK9_?usp=drive_link";
@@ -89,27 +91,20 @@ const permissoes = [
   },
 ];
 
-function funcoesDisponiveis(funcao?: string) {
-  if (funcao === "Administrador") {
-    return ["Administrador", "Gerente", "Vendedor", "Técnico"];
-  }
-
-  if (funcao === "Gerente") {
-    return ["Vendedor", "Técnico"];
-  }
-
-  return [];
-}
-
 export default function TelaConfiguracoes() {
   const { cores, ehDesktop } = useTema();
   const largura = useLarguraConteudo();
   const { avisar } = useAvisos();
   const { usuario } = useAutenticacao();
   const clienteConsultas = useQueryClient();
+  const gestao = ehGestao(usuario?.funcao);
+  const versao = Constants.expoConfig?.version ?? "1.0.0";
 
   const { data: configuracao } = useQuery<ConfiguracaoLoja>({ queryKey: chaves.configuracaoLoja });
-  const { data: usuarios = [] } = useQuery<Usuario[]>({ queryKey: chaves.usuarios });
+  const { data: usuarios = [] } = useQuery<Usuario[]>({
+    queryKey: chaves.usuarios,
+    enabled: gestao,
+  });
 
   const [logo, setLogo] = useState<string | null>(null);
   const [dadosLoja, setDadosLoja] = useState({
@@ -139,10 +134,6 @@ export default function TelaConfiguracoes() {
     somFinalizacao: false,
     impressaoAutomatica: true,
   });
-  const [whatsApp, setWhatsApp] = useState({
-    phoneNumberId: "",
-    token: "",
-  });
 
   const [perfil, setPerfil] = useState({ nomeUsuario: "", email: "", senha: "" });
   const [dialogoUsuario, setDialogoUsuario] = useState(false);
@@ -153,7 +144,6 @@ export default function TelaConfiguracoes() {
     senha: "",
     funcao: "Vendedor",
   });
-  const [verificandoAtualizacoes, setVerificandoAtualizacoes] = useState(false);
 
   useEffect(() => {
     if (!configuracao) {
@@ -188,10 +178,6 @@ export default function TelaConfiguracoes() {
       somFinalizacao: configuracao.somFinalizacao,
       impressaoAutomatica: configuracao.impressaoAutomatica,
     });
-    setWhatsApp((atual) => ({
-      phoneNumberId: configuracao.whatsAppPhoneNumberId ?? "",
-      token: atual.token,
-    }));
   }, [configuracao]);
 
   useEffect(() => {
@@ -227,8 +213,6 @@ export default function TelaConfiguracoes() {
         alertaEstoqueBaixo: preferencias.alertaEstoqueBaixo,
         somFinalizacao: preferencias.somFinalizacao,
         impressaoAutomatica: preferencias.impressaoAutomatica,
-        whatsAppPhoneNumberId: whatsApp.phoneNumberId || null,
-        whatsAppToken: whatsApp.token || null,
         ...dados,
       }),
     onSuccess: () => clienteConsultas.invalidateQueries({ queryKey: chaves.configuracaoLoja }),
@@ -244,8 +228,8 @@ export default function TelaConfiguracoes() {
     onSuccess: () => clienteConsultas.invalidateQueries({ queryKey: chaves.usuarios }),
   });
 
-  const disponiveis = funcoesDisponiveis(usuario?.funcao);
-  const podeCriarUsuarios = disponiveis.length > 0;
+  const disponiveis = funcoesQuePodeCriar(usuario?.funcao);
+  const podeCriarUsuarios = gestao && disponiveis.length > 0;
 
   async function persistir(dados: Partial<ConfiguracaoLoja>, titulo: string, descricao: string) {
     try {
@@ -272,6 +256,11 @@ export default function TelaConfiguracoes() {
 
   async function salvarPerfil() {
     if (!usuario) {
+      return;
+    }
+
+    if (perfil.senha && perfil.senha.length < 8) {
+      avisar({ titulo: "Erro", descricao: "A senha deve ter no mínimo 8 caracteres", variante: "perigo" });
       return;
     }
 
@@ -313,7 +302,12 @@ export default function TelaConfiguracoes() {
       return;
     }
 
-    if (!disponiveis.includes(novoUsuario.funcao)) {
+    if (!novoUsuario.senha || novoUsuario.senha.length < 8) {
+      avisar({ titulo: "Erro", descricao: "A senha deve ter no mínimo 8 caracteres", variante: "perigo" });
+      return;
+    }
+
+    if (!podeCriarFuncao(usuario?.funcao, novoUsuario.funcao)) {
       avisar({
         titulo: "Sem permissão",
         descricao: `Você não tem permissão para criar usuários com a função ${novoUsuario.funcao}`,
@@ -352,15 +346,16 @@ export default function TelaConfiguracoes() {
   }
 
   async function backup() {
-    const [produtos, vendas, ordens, vendedores] = await Promise.all([
+    const [produtos, vendas, ordens, vendedores, clientes] = await Promise.all([
       api.obter("/api/produtos"),
       api.obter("/api/vendas"),
       api.obter("/api/ordens-servico"),
       api.obter("/api/vendedores"),
+      api.obter<Cliente[]>("/api/clientes"),
     ]);
 
     const conteudo = JSON.stringify(
-      { geradoEm: new Date().toISOString(), produtos, vendas, ordens, vendedores, configuracao },
+      { geradoEm: new Date().toISOString(), produtos, vendas, ordens, vendedores, clientes, configuracao },
       null,
       2,
     );
@@ -380,15 +375,8 @@ export default function TelaConfiguracoes() {
     });
   }
 
-  async function verificarAtualizacoes() {
-    setVerificandoAtualizacoes(true);
-    await new Promise((resolver) => setTimeout(resolver, 2000));
-    setVerificandoAtualizacoes(false);
-
-    avisar({
-      titulo: "Verificação concluída",
-      descricao: "Sistema atualizado. Versão 1.0.0 é a mais recente.",
-    });
+  async function abrirAtualizacoes() {
+    await Linking.openURL(urlAtualizacoes);
   }
 
   return (
@@ -397,6 +385,7 @@ export default function TelaConfiguracoes() {
 
       <Grade colunas={colunas(largura, 320, 3)} largura={largura}>
         {[
+          gestao ? (
           <Cartao key="logo" testID="card-logo-settings">
             <View style={{ padding: espaco.lg, gap: espaco.md }}>
               <TituloSecao icone={<ImagemIcone size={20} color={cores.primaria} />} texto="Logo da Loja" />
@@ -473,7 +462,8 @@ export default function TelaConfiguracoes() {
                 </View>
               ) : null}
             </View>
-          </Cartao>,
+          </Cartao>
+          ) : null,
 
           <Cartao key="perfil" testID="card-user-settings">
             <View style={{ padding: espaco.lg, gap: espaco.md }}>
@@ -515,6 +505,7 @@ export default function TelaConfiguracoes() {
             </View>
           </Cartao>,
 
+          gestao ? (
           <Cartao key="loja" testID="card-store-settings">
             <View style={{ padding: espaco.lg, gap: espaco.md }}>
               <TituloSecao icone={<Store size={20} color={cores.primaria} />} texto="Informações da Loja" />
@@ -556,10 +547,13 @@ export default function TelaConfiguracoes() {
                 }
               />
             </View>
-          </Cartao>,
-        ]}
+          </Cartao>
+          ) : null,
+        ].filter(Boolean)}
       </Grade>
 
+      {gestao ? (
+      <>
       <Cartao testID="card-store-data">
         <View style={{ padding: espaco.lg, gap: espaco.md }}>
           <TituloSecao icone={<Store size={20} color={cores.primaria} />} texto="Dados da Loja" />
@@ -606,14 +600,6 @@ export default function TelaConfiguracoes() {
                   onChange={(texto) => setDadosLoja({ ...dadosLoja, cep: texto })}
                 />
               </View>,
-              <View key="telefone" style={{ gap: espaco.sm }}>
-                <Rotulo>Telefone</Rotulo>
-                <Campo
-                  testID="input-phone"
-                  valor={dadosLoja.telefoneLoja}
-                  onChange={(texto) => setDadosLoja({ ...dadosLoja, telefoneLoja: texto })}
-                />
-              </View>,
             ]}
           </Grade>
 
@@ -630,80 +616,15 @@ export default function TelaConfiguracoes() {
 
       <Cartao testID="card-whatsapp-settings">
         <View style={{ padding: espaco.lg, gap: espaco.md }}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: espaco.md,
-            }}
-          >
-            <TituloSecao icone={<MessageCircle size={20} color={cores.primaria} />} texto="WhatsApp da oficina" />
-            <Selo
-              testID="badge-whatsapp-configured"
-              texto={configuracao?.whatsAppConfigurado ? "Configurado: sim" : "Configurado: não"}
-              variante={configuracao?.whatsAppConfigurado ? "sucesso" : "contorno"}
-            />
-          </View>
-
+          <TituloSecao icone={<MessageCircle size={20} color={cores.primaria} />} texto="WhatsApp da oficina" />
           <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
-            O sistema não envia WhatsApp sozinho. Use o botão Compartilhar na OS para abrir o WhatsApp
-            com a mensagem pronta — o atendente pode editar o texto antes de enviar. Token e Phone Number
-            Id da Meta são opcionais e ficam só como referência da oficina.
+            O sistema não envia WhatsApp sozinho. Use o botão Compartilhar na ordem de serviço para
+            abrir o WhatsApp com a mensagem pronta — o atendente pode editar o texto antes de enviar.
           </Text>
-
-          <View style={{ gap: espaco.sm }}>
-            <Rotulo>Phone Number Id</Rotulo>
-            <Campo
-              testID="input-whatsapp-phone-number-id"
-              valor={whatsApp.phoneNumberId}
-              onChange={(texto) => setWhatsApp({ ...whatsApp, phoneNumberId: texto })}
-              placeholder="ID do número no Meta Business"
-            />
-          </View>
-
-          <View style={{ gap: espaco.sm }}>
-            <Rotulo>Token de acesso</Rotulo>
-            <Campo
-              testID="input-whatsapp-token"
-              valor={whatsApp.token}
-              onChange={(texto) => setWhatsApp({ ...whatsApp, token: texto })}
-              placeholder={
-                configuracao?.whatsAppConfigurado
-                  ? "Token já salvo — deixe em branco para manter"
-                  : "Cole o token permanente (não é exibido depois)"
-              }
-              segredo
-            />
-            <Text style={{ color: cores.suaveTexto, fontSize: fonte.xs }}>
-              O token não volta no GET por segurança. Só informe de novo se quiser trocá-lo.
-            </Text>
-          </View>
-
-          <Botao
-            testID="button-save-whatsapp"
-            titulo="Salvar WhatsApp"
-            larguraTotal
-            icone={<Save size={16} color={cores.primariaTexto} />}
-            onPress={async () => {
-              const ok = await persistir(
-                {
-                  whatsAppPhoneNumberId: whatsApp.phoneNumberId || null,
-                  whatsAppToken: whatsApp.token || null,
-                },
-                "WhatsApp salvo",
-                configuracao?.whatsAppConfigurado || whatsApp.token
-                  ? "Os avisos das OS usarão a API oficial quando o token estiver válido."
-                  : "Sem token, o WhatsApp abrirá com a mensagem pronta.",
-              );
-
-              if (ok) {
-                setWhatsApp((atual) => ({ ...atual, token: "" }));
-              }
-            }}
-          />
         </View>
       </Cartao>
+      </>
+      ) : null}
 
       <Cartao testID="card-system-settings">
         <View style={{ padding: espaco.lg, gap: espaco.md }}>
@@ -713,6 +634,8 @@ export default function TelaConfiguracoes() {
             <AlternarTema />
           </LinhaPreferencia>
 
+          {gestao ? (
+            <>
           <LinhaPreferencia
             titulo="Notificações de Estoque"
             descricao="Alertas quando estoque estiver baixo"
@@ -760,9 +683,13 @@ export default function TelaConfiguracoes() {
               }}
             />
           </LinhaPreferencia>
+            </>
+          ) : null}
         </View>
       </Cartao>
 
+      {gestao ? (
+      <>
       <Cartao testID="card-permissions">
         <View style={{ padding: espaco.lg, gap: espaco.md }}>
           <TituloSecao icone={<Users size={20} color={cores.primaria} />} texto="Estrutura de Permissões" />
@@ -932,7 +859,7 @@ export default function TelaConfiguracoes() {
 
               <LinhaPreferencia
                 titulo="Mostrar Dados Fiscais"
-                descricao="Incluir CNPJ e Inscrição Estadual"
+                descricao="Incluir CNPJ, razão social, endereço e telefone"
               >
                 <Interruptor
                   testID="switch-show-fiscal-data"
@@ -972,6 +899,10 @@ export default function TelaConfiguracoes() {
                   onChange={(texto) => setImpressora({ ...impressora, nome: texto })}
                   placeholder="Ex: Impressora Térmica USB"
                 />
+                <Text style={{ color: cores.suaveTexto, fontSize: fonte.xs }}>
+                  O navegador não escolhe a impressora sozinho. No diálogo de impressão, selecione
+                  {impressora.nome ? ` ${impressora.nome}` : " a térmica da loja"}.
+                </Text>
               </View>
 
               <View style={{ gap: espaco.sm }}>
@@ -994,7 +925,10 @@ export default function TelaConfiguracoes() {
                 />
               </View>
 
-              <LinhaPreferencia titulo="Corte Automático" descricao="Cortar papel após impressão">
+              <LinhaPreferencia
+                titulo="Espaço para corte"
+                descricao="Aumenta a margem inferior do papel. O corte automático depende do driver da impressora."
+              >
                 <Interruptor
                   testID="switch-auto-cut"
                   valor={impressora.corteAutomatico}
@@ -1025,8 +959,8 @@ export default function TelaConfiguracoes() {
           <TituloSecao icone={<Database size={20} color={cores.primaria} />} texto="Backup do Sistema" />
 
           <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
-            Faça backup de todos os dados do sistema incluindo produtos, vendas, ordens de serviço e
-            configurações.
+            Baixa um JSON com produtos, vendas, ordens de serviço, clientes, vendedores e configurações.
+            A importação do outro PDV da loja será feita em um projeto à parte.
           </Text>
 
           <View style={{ flexDirection: "row", gap: espaco.lg, flexWrap: "wrap" }}>
@@ -1035,19 +969,6 @@ export default function TelaConfiguracoes() {
               titulo="Fazer Backup Agora"
               icone={<Download size={16} color={cores.primariaTexto} />}
               onPress={backup}
-            />
-            <Botao
-              testID="button-restore"
-              titulo="Restaurar Backup"
-              variante="contorno"
-              icone={<Database size={16} color={cores.texto} />}
-              onPress={() =>
-                avisar({
-                  titulo: "Restauração indisponível",
-                  descricao: "A restauração de backup será liberada em uma próxima versão.",
-                  variante: "perigo",
-                })
-              }
             />
           </View>
         </View>
@@ -1072,26 +993,25 @@ export default function TelaConfiguracoes() {
               <CheckCircle size={24} color={cores.sucesso} />
               <View>
                 <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "500" }}>
-                  Sistema Atualizado
+                  Versão instalada
                 </Text>
                 <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
-                  Versão 1.0.0 - Última verificação: hoje
+                  BRINKPDV {versao}
                 </Text>
               </View>
             </View>
 
             <Botao
               testID="button-check-updates"
-              titulo={verificandoAtualizacoes ? "Verificando..." : "Verificar Atualizações"}
+              titulo="Abrir pasta de atualizações"
               variante="contorno"
-              carregando={verificandoAtualizacoes}
               icone={<RefreshCcw size={16} color={cores.texto} />}
-              onPress={verificarAtualizacoes}
+              onPress={abrirAtualizacoes}
             />
           </View>
 
           <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm, fontWeight: "600" }}>
-            Notas da Versão 1.0.0:
+            Notas da Versão {versao}:
           </Text>
           {[
             "Sistema PDV completo com vendas e caixa",
@@ -1100,7 +1020,7 @@ export default function TelaConfiguracoes() {
             "Comissões de vendedores",
             "Relatórios e estatísticas",
             "Impressão de recibos e comprovantes",
-            "Backup e restauração de dados",
+            "Backup dos dados em JSON",
           ].map((nota) => (
             <Text key={nota} style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
               ✅ {nota}
@@ -1117,6 +1037,8 @@ export default function TelaConfiguracoes() {
           </View>
         </View>
       </Cartao>
+      </>
+      ) : null}
 
       <Dialogo
         aberto={dialogoUsuario}

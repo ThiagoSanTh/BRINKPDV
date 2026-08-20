@@ -10,7 +10,7 @@
         "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj",
         "projectName": "PDV.Dominio",
         "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/PDV.Dominio.csproj",
-        "packagesPath": "/home/thsanth/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/250e9b94bf1533904f7ede9a596afdfe/nuget",
         "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Dominio/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -68,7 +68,7 @@
         "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj",
         "projectName": "PDV.Infraestrutura",
         "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj",
-        "packagesPath": "/home/thsanth/.nuget/packages/",
+        "packagesPath": "/tmp/cursor-sandbox-cache/250e9b94bf1533904f7ede9a596afdfe/nuget",
         "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
