@@ -1,0 +1,4 @@
+BackEnd/**/bin/
+BackEnd/**/obj/
+FrontEnd/dist/
+FrontEnd/node_modules/
