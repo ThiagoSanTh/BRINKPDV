@@ -54,6 +54,21 @@ public static class Mapeador
         cliente.Observacoes,
         cliente.CriadoEm);
 
+    public static ItemOrdemServicoDto ParaDto(this ItemOrdemServico item) => new(
+        item.ServicoId,
+        item.Nome,
+        item.Descricao,
+        item.ValorCobrado,
+        item.Total);
+
+    public static ServicoCatalogoDto ParaDto(this ServicoCatalogo servico) => new(
+        servico.Id,
+        servico.Nome,
+        servico.Descricao,
+        servico.PrecoPadrao,
+        servico.Ativo,
+        servico.CriadoEm);
+
     public static OrdemServicoDto ParaDto(this OrdemServico ordem, ResultadoWhatsAppDto? whatsapp = null) => new(
         ordem.Id,
         ordem.Numero,
@@ -72,6 +87,7 @@ public static class Mapeador
         ordem.Data,
         ordem.Prazo,
         ordem.DataSaida,
+        ordem.ItensServico.Select(item => item.ParaDto()).ToList(),
         whatsapp);
 
     public static UsuarioDto ParaDto(this Usuario usuario) => new(

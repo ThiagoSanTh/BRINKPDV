@@ -1,3 +1,30 @@
+export type Servico = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  precoPadrao: number | null;
+  ativo: boolean;
+  criadoEm: string;
+};
+
+export type ItemOrdemServico = {
+  servicoId: string;
+  nome: string;
+  descricao: string | null;
+  valorCobrado: number;
+  total: number;
+};
+
+export type BackupResumo = {
+  format: string;
+  version: number;
+  createdAt: string;
+  storeName: string | null;
+  records: Record<string, number>;
+  compativel: boolean;
+  mensagem: string | null;
+};
+
 export type Produto = {
   id: string;
   sku: string;
@@ -78,6 +105,7 @@ export type OrdemServico = {
   prazo: string;
   dataSaida: string | null;
   whatsApp?: ResultadoWhatsApp | null;
+  itensServico: ItemOrdemServico[];
 };
 
 export type Usuario = {

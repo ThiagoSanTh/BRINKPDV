@@ -25,6 +25,7 @@ export const itensMenu = [
   { titulo: "Clientes", rota: "/clients", icone: Contact, teste: "link-clientes" },
   { titulo: "Vendedores", rota: "/salespersons", icone: Users, teste: "link-vendedores" },
   { titulo: "Produtos", rota: "/products", icone: Package, teste: "link-produtos" },
+  { titulo: "Serviços", rota: "/services", icone: Wrench, teste: "link-serviços" },
   { titulo: "Relatórios", rota: "/reports", icone: BarChart3, teste: "link-relatórios" },
   { titulo: "Configurações", rota: "/settings", icone: IconeConfiguracoes, teste: "link-configurações" },
 ] as const;

@@ -23,9 +23,10 @@ public class OrdensServicoController : ControllerBase
         [FromQuery] string? busca,
         [FromQuery] string? status,
         [FromQuery] string? clienteId,
-        CancellationToken cancelamento)
+        [FromQuery] bool emAndamento = false,
+        CancellationToken cancelamento = default)
     {
-        return Ok(await _servico.ListarAsync(busca, status, clienteId, cancelamento));
+        return Ok(await _servico.ListarAsync(busca, status, clienteId, emAndamento, cancelamento));
     }
 
     [HttpGet("{id}")]

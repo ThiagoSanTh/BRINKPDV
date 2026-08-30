@@ -8,6 +8,7 @@ public interface IRepositorioOrdemServico
         string? busca = null,
         string? status = null,
         string? clienteId = null,
+        bool emAndamento = false,
         CancellationToken cancelamento = default);
 
     Task<IReadOnlyList<OrdemServico>> ObterPorClienteAsync(string clienteId, CancellationToken cancelamento = default);

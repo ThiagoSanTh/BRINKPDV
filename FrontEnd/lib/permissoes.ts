@@ -16,6 +16,7 @@ const rotasPorFuncao: Record<string, readonly string[]> = {
     "/clients",
     "/salespersons",
     "/products",
+    "/services",
     "/reports",
     "/settings",
   ],
@@ -27,11 +28,12 @@ const rotasPorFuncao: Record<string, readonly string[]> = {
     "/clients",
     "/salespersons",
     "/products",
+    "/services",
     "/reports",
     "/settings",
   ],
-  Vendedor: ["/", "/pos", "/daily-sales", "/clients", "/products", "/settings"],
-  Técnico: ["/", "/service-orders", "/clients", "/settings"],
+  Vendedor: ["/", "/pos", "/daily-sales", "/clients", "/products", "/services", "/settings"],
+  Técnico: ["/", "/service-orders", "/clients", "/services", "/settings"],
 };
 
 export function rotaBase(rota: string) {

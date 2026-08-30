@@ -11,22 +11,26 @@ public class ServicoOrdemServico : IServicoOrdemServico
 {
     private readonly IRepositorioOrdemServico _repositorio;
     private readonly IRepositorioCliente _repositorioCliente;
+    private readonly IRepositorioServico _repositorioServico;
 
     public ServicoOrdemServico(
         IRepositorioOrdemServico repositorio,
-        IRepositorioCliente repositorioCliente)
+        IRepositorioCliente repositorioCliente,
+        IRepositorioServico repositorioServico)
     {
         _repositorio = repositorio;
         _repositorioCliente = repositorioCliente;
+        _repositorioServico = repositorioServico;
     }
 
     public async Task<IReadOnlyList<OrdemServicoDto>> ListarAsync(
         string? busca = null,
         string? status = null,
         string? clienteId = null,
+        bool emAndamento = false,
         CancellationToken cancelamento = default)
     {
-        var ordens = await _repositorio.ObterTodasAsync(busca, status, clienteId, cancelamento);
+        var ordens = await _repositorio.ObterTodasAsync(busca, status, clienteId, emAndamento, cancelamento);
         return ordens.Select(ordem => ordem.ParaDto()).ToList();
     }
 
@@ -48,6 +52,9 @@ public class ServicoOrdemServico : IServicoOrdemServico
     {
         var cliente = await ResolverClienteAsync(entrada, cancelamento);
         Validar(entrada);
+
+        var itens = await MontarItensAsync(entrada.ItensServico, cancelamento);
+        var valor = CalcularValor(entrada.Valor, itens);
 
         var total = await _repositorio.ContarAsync(cancelamento);
         var hoje = DateOnly.FromDateTime(DateTime.Today);
@@ -75,7 +82,8 @@ public class ServicoOrdemServico : IServicoOrdemServico
             Problema = entrada.Problema!.Trim(),
             Status = status,
             Prioridade = entrada.Prioridade ?? PrioridadesOrdemServico.Media,
-            Valor = entrada.Valor,
+            Valor = valor,
+            ItensServico = itens,
             Data = hoje,
             Prazo = entrada.Prazo ?? hoje.AddDays(7),
             DataSaida = StatusOrdemServico.EstaEncerrada(status)
@@ -110,6 +118,14 @@ public class ServicoOrdemServico : IServicoOrdemServico
             ? $"{marca} {modelo}".Trim()
             : entrada.Aparelho.Trim();
 
+        var itens = entrada.ItensServico is not null
+            ? await MontarItensAsync(entrada.ItensServico, cancelamento)
+            : existente.ItensServico;
+
+        var valor = entrada.ItensServico is not null
+            ? CalcularValor(entrada.Valor, itens)
+            : (itens.Count > 0 ? itens.Sum(item => item.ValorCobrado) : entrada.Valor);
+
         existente.ClienteId = cliente.Id;
         existente.Cliente = cliente.Nome;
         existente.ContatoCliente = cliente.Telefone;
@@ -123,7 +139,8 @@ public class ServicoOrdemServico : IServicoOrdemServico
         existente.Problema = string.IsNullOrWhiteSpace(entrada.Problema) ? existente.Problema : entrada.Problema.Trim();
         existente.Status = status;
         existente.Prioridade = entrada.Prioridade ?? existente.Prioridade;
-        existente.Valor = entrada.Valor;
+        existente.Valor = valor;
+        existente.ItensServico = itens;
         existente.Prazo = entrada.Prazo ?? existente.Prazo;
         existente.DataSaida = status == StatusOrdemServico.Entregue
             ? entrada.DataSaida ?? existente.DataSaida ?? DateOnly.FromDateTime(DateTime.Today)
@@ -136,6 +153,49 @@ public class ServicoOrdemServico : IServicoOrdemServico
     public async Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default)
     {
         return await _repositorio.RemoverAsync(id, cancelamento);
+    }
+
+    private async Task<List<ItemOrdemServico>> MontarItensAsync(
+        List<ItemOrdemServicoEntradaDto>? itensEntrada,
+        CancellationToken cancelamento)
+    {
+        if (itensEntrada is null || itensEntrada.Count == 0)
+        {
+            return [];
+        }
+
+        var itens = new List<ItemOrdemServico>();
+
+        foreach (var itemEntrada in itensEntrada)
+        {
+            if (string.IsNullOrWhiteSpace(itemEntrada.ServicoId))
+            {
+                throw new RegraNegocioException("Informe o serviço de cada item da ordem.");
+            }
+
+            var servico = await _repositorioServico.ObterPorIdAsync(itemEntrada.ServicoId, cancelamento)
+                ?? throw new RecursoNaoEncontradoException($"Serviço '{itemEntrada.ServicoId}' não encontrado.");
+
+            if (itemEntrada.ValorCobrado < 0)
+            {
+                throw new RegraNegocioException("O valor cobrado do item não pode ser negativo.");
+            }
+
+            itens.Add(new ItemOrdemServico
+            {
+                ServicoId = servico.Id,
+                Nome = string.IsNullOrWhiteSpace(itemEntrada.Nome) ? servico.Nome : itemEntrada.Nome.Trim(),
+                Descricao = string.IsNullOrWhiteSpace(itemEntrada.Descricao) ? servico.Descricao : itemEntrada.Descricao.Trim(),
+                ValorCobrado = itemEntrada.ValorCobrado,
+            });
+        }
+
+        return itens;
+    }
+
+    private static decimal CalcularValor(decimal valorInformado, List<ItemOrdemServico> itens)
+    {
+        return itens.Count > 0 ? itens.Sum(item => item.ValorCobrado) : valorInformado;
     }
 
     private async Task<Cliente> ResolverClienteAsync(

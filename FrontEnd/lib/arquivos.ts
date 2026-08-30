@@ -41,6 +41,42 @@ export async function escolherImagemBase64(): Promise<string | null> {
   return `data:${ativo.mimeType ?? "image/jpeg"};base64,${ativo.base64}`;
 }
 
+export function baixarBlob(nome: string, blob: Blob) {
+  if (Platform.OS !== "web") {
+    return false;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = nome;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  return true;
+}
+
+export async function escolherArquivo(extensao: string): Promise<File | null> {
+  if (Platform.OS !== "web") {
+    return null;
+  }
+
+  return new Promise((resolver) => {
+    const entrada = document.createElement("input");
+    entrada.type = "file";
+    entrada.accept = extensao;
+
+    entrada.onchange = () => {
+      resolver(entrada.files?.[0] ?? null);
+    };
+
+    entrada.click();
+  });
+}
+
 export function baixarTexto(nome: string, conteudo: string, tipo: string) {
   if (Platform.OS !== "web") {
     return false;

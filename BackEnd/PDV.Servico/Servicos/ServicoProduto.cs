@@ -16,10 +16,68 @@ public class ServicoProduto : IServicoProduto
         _repositorio = repositorio;
     }
 
-    public async Task<IReadOnlyList<ProdutoDto>> ListarAsync(CancellationToken cancelamento = default)
+    public async Task<IReadOnlyList<ProdutoDto>> ListarAsync(string? categoria = null, CancellationToken cancelamento = default)
     {
-        var produtos = await _repositorio.ObterTodosAsync(cancelamento);
+        var produtos = string.IsNullOrWhiteSpace(categoria)
+            ? await _repositorio.ObterTodosAsync(cancelamento)
+            : await _repositorio.ObterPorCategoriaAsync(categoria.Trim(), cancelamento);
+
         return produtos.Select(produto => produto.ParaDto()).ToList();
+    }
+
+    public async Task<IReadOnlyList<CategoriaResumoDto>> ListarCategoriasAsync(CancellationToken cancelamento = default)
+    {
+        var categorias = await _repositorio.ListarCategoriasAsync(cancelamento);
+        return categorias
+            .Select(categoria => new CategoriaResumoDto(categoria.Nome, categoria.Quantidade))
+            .ToList();
+    }
+
+    public async Task<RenomearCategoriaResultadoDto> RenomearCategoriaAsync(
+        RenomearCategoriaDto entrada,
+        CancellationToken cancelamento = default)
+    {
+        if (string.IsNullOrWhiteSpace(entrada.NomeAtual))
+        {
+            throw new RegraNegocioException("Informe o nome atual da categoria.");
+        }
+
+        if (string.IsNullOrWhiteSpace(entrada.NomeNovo))
+        {
+            throw new RegraNegocioException("Informe o novo nome da categoria.");
+        }
+
+        var nomeAtual = entrada.NomeAtual.Trim();
+        var nomeNovo = entrada.NomeNovo.Trim();
+
+        if (string.Equals(nomeAtual, nomeNovo, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RegraNegocioException("O novo nome deve ser diferente do nome atual.");
+        }
+
+        var categorias = await _repositorio.ListarCategoriasAsync(cancelamento);
+        var existeAtual = categorias.Any(categoria =>
+            string.Equals(categoria.Nome, nomeAtual, StringComparison.OrdinalIgnoreCase));
+
+        if (!existeAtual)
+        {
+            throw new RecursoNaoEncontradoException($"Categoria '{nomeAtual}' não encontrada.");
+        }
+
+        var duplicada = categorias.Any(categoria =>
+            string.Equals(categoria.Nome, nomeNovo, StringComparison.OrdinalIgnoreCase));
+
+        if (duplicada)
+        {
+            throw new RegraNegocioException($"Já existe uma categoria com o nome '{nomeNovo}'.");
+        }
+
+        var categoriaReal = categorias
+            .First(categoria => string.Equals(categoria.Nome, nomeAtual, StringComparison.OrdinalIgnoreCase))
+            .Nome;
+
+        var atualizados = await _repositorio.RenomearCategoriaAsync(categoriaReal, nomeNovo, cancelamento);
+        return new RenomearCategoriaResultadoDto(categoriaReal, nomeNovo, atualizados);
     }
 
     public async Task<ProdutoDto?> ObterAsync(string id, CancellationToken cancelamento = default)

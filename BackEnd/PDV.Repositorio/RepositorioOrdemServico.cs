@@ -18,11 +18,19 @@ public class RepositorioOrdemServico : IRepositorioOrdemServico
         string? busca = null,
         string? status = null,
         string? clienteId = null,
+        bool emAndamento = false,
         CancellationToken cancelamento = default)
     {
         var consulta = _contexto.OrdensServico.AsNoTracking().AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(status))
+        if (emAndamento || string.Equals(status, "__em_andamento__", StringComparison.OrdinalIgnoreCase))
+        {
+            consulta = consulta.Where(ordem =>
+                ordem.Status != StatusOrdemServico.Entregue &&
+                ordem.Status != StatusOrdemServico.Cancelada &&
+                ordem.Status != "Concluída");
+        }
+        else if (!string.IsNullOrWhiteSpace(status))
         {
             consulta = consulta.Where(ordem => ordem.Status == status);
         }
@@ -101,6 +109,7 @@ public class RepositorioOrdemServico : IRepositorioOrdemServico
         existente.Status = ordem.Status;
         existente.Prioridade = ordem.Prioridade;
         existente.Valor = ordem.Valor;
+        existente.ItensServico = ordem.ItensServico;
         existente.Prazo = ordem.Prazo;
         existente.DataSaida = ordem.DataSaida;
 

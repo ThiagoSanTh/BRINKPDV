@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -13,10 +13,11 @@ import { Seletor } from "../../componentes/ui/Seletor";
 import { TituloPagina } from "../../componentes/ui/TituloPagina";
 import { api } from "../../lib/api";
 import { chaves } from "../../lib/consultas";
-import { paraNumero } from "../../lib/formato";
+import { moeda, paraNumero } from "../../lib/formato";
 import {
   Cliente,
   OrdemServico,
+  Servico,
   estadosAparelho,
   marcasAparelho,
   prioridadesOrdemServico,
@@ -24,7 +25,14 @@ import {
   tiposAparelho,
 } from "../../lib/tipos";
 import { useTema } from "../../tema/TemaProvider";
-import { espaco, fonte } from "../../tema/tokens";
+import { espaco, fonte, raio } from "../../tema/tokens";
+
+type ItemFormulario = {
+  servicoId: string;
+  nome: string;
+  descricao: string | null;
+  valorCobrado: string;
+};
 
 export default function TelaNovaOrdemServico() {
   const { cores, ehDesktop } = useTema();
@@ -39,6 +47,7 @@ export default function TelaNovaOrdemServico() {
   const editando = Boolean(idEdicao);
 
   const { data: clientes = [] } = useQuery<Cliente[]>({ queryKey: chaves.clientes });
+  const { data: servicos = [] } = useQuery<Servico[]>({ queryKey: chaves.servicos });
   const { data: ordemAtual } = useQuery<OrdemServico>({
     queryKey: ["/api/ordens-servico/", idEdicao],
     enabled: editando,
@@ -59,6 +68,8 @@ export default function TelaNovaOrdemServico() {
   const [prazo, setPrazo] = useState("");
   const [valor, setValor] = useState("");
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [servicoSelecionado, setServicoSelecionado] = useState<string | null>(null);
+  const [itensServico, setItensServico] = useState<ItemFormulario[]>([]);
 
   useEffect(() => {
     const id = Array.isArray(clienteIdParam) ? clienteIdParam[0] : clienteIdParam;
@@ -97,7 +108,30 @@ export default function TelaNovaOrdemServico() {
     setStatus(ordemAtual.status);
     setPrazo(ordemAtual.prazo?.slice(0, 10) ?? "");
     setValor(String(ordemAtual.valor ?? 0).replace(".", ","));
+    setItensServico(
+      (ordemAtual.itensServico ?? []).map((item) => ({
+        servicoId: item.servicoId,
+        nome: item.nome,
+        descricao: item.descricao,
+        valorCobrado: String(item.valorCobrado).replace(".", ","),
+      })),
+    );
   }, [ordemAtual]);
+
+  const opcoesServicos = useMemo(
+    () =>
+      servicos
+        .filter((servico) => servico.ativo)
+        .map((servico) => ({ valor: servico.id, rotulo: servico.nome })),
+    [servicos],
+  );
+
+  const totalItens = useMemo(
+    () => itensServico.reduce((soma, item) => soma + paraNumero(item.valorCobrado || "0"), 0),
+    [itensServico],
+  );
+
+  const valorCalculado = itensServico.length > 0 ? totalItens : paraNumero(valor);
 
   const opcoesClientes = useMemo(
     () => clientes.map((cliente) => ({ valor: cliente.id, rotulo: `${cliente.nome} — ${cliente.telefone}` })),
@@ -138,8 +172,64 @@ export default function TelaNovaOrdemServico() {
     }
   }
 
+  function adicionarServico() {
+    if (!servicoSelecionado) {
+      avisar({
+        titulo: "Selecione um serviço",
+        descricao: "Escolha um serviço do catálogo para adicionar.",
+        variante: "perigo",
+      });
+      return;
+    }
+
+    const servico = servicos.find((item) => item.id === servicoSelecionado);
+
+    if (!servico) {
+      return;
+    }
+
+    if (itensServico.some((item) => item.servicoId === servico.id)) {
+      avisar({
+        titulo: "Serviço já adicionado",
+        descricao: "Este serviço já está na ordem.",
+        variante: "perigo",
+      });
+      return;
+    }
+
+    const valorSugerido =
+      servico.precoPadrao != null ? String(servico.precoPadrao).replace(".", ",") : "";
+
+    setItensServico((atual) => [
+      ...atual,
+      {
+        servicoId: servico.id,
+        nome: servico.nome,
+        descricao: servico.descricao,
+        valorCobrado: valorSugerido,
+      },
+    ]);
+    setServicoSelecionado(null);
+  }
+
+  function removerItem(servicoId: string) {
+    setItensServico((atual) => atual.filter((item) => item.servicoId !== servicoId));
+  }
+
+  function atualizarValorItem(servicoId: string, valorCobrado: string) {
+    setItensServico((atual) =>
+      atual.map((item) => (item.servicoId === servicoId ? { ...item, valorCobrado } : item)),
+    );
+  }
+
   function montarPayload() {
     const marcaFinal = marca === "Outra" ? marcaOutra.trim() : marca;
+    const itensPayload = itensServico.map((item) => ({
+      servicoId: item.servicoId,
+      nome: item.nome,
+      descricao: item.descricao,
+      valorCobrado: paraNumero(item.valorCobrado || "0"),
+    }));
 
     return {
       clienteId: clienteId || null,
@@ -152,8 +242,9 @@ export default function TelaNovaOrdemServico() {
       problema: problema.trim(),
       prioridade,
       status,
-      valor: paraNumero(valor),
+      valor: valorCalculado,
       prazo: prazo || null,
+      itensServico: itensPayload.length > 0 ? itensPayload : undefined,
     };
   }
 
@@ -424,6 +515,84 @@ export default function TelaNovaOrdemServico() {
 
       <Cartao>
         <View style={{ padding: espaco.xl, gap: espaco.lg }}>
+          <Text style={{ color: cores.texto, fontSize: fonte.lg, fontWeight: "600" }}>Serviços</Text>
+
+          {opcoesServicos.length === 0 ? (
+            <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+              Nenhum serviço cadastrado. Cadastre serviços em Serviços antes de adicionar à OS.
+            </Text>
+          ) : (
+            <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md, alignItems: "flex-end" }}>
+              <View style={{ flex: 1, gap: espaco.sm }}>
+                <Rotulo>Adicionar serviço</Rotulo>
+                <Seletor
+                  testID="select-service"
+                  valor={servicoSelecionado}
+                  onChange={setServicoSelecionado}
+                  opcoes={opcoesServicos}
+                  placeholder="Selecione um serviço"
+                />
+              </View>
+              <Botao
+                testID="button-add-service-item"
+                titulo="Adicionar"
+                icone={<Plus size={16} color={cores.primariaTexto} />}
+                onPress={adicionarServico}
+              />
+            </View>
+          )}
+
+          {itensServico.length > 0 ? (
+            <View style={{ gap: espaco.md }}>
+              {itensServico.map((item) => (
+                <View
+                  key={item.servicoId}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: cores.borda,
+                    borderRadius: raio.medio,
+                    padding: espaco.md,
+                    gap: espaco.sm,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "600" }}>{item.nome}</Text>
+                    <Botao
+                      testID={`button-remove-service-${item.servicoId}`}
+                      variante="fantasma"
+                      tamanho="icone"
+                      onPress={() => removerItem(item.servicoId)}
+                      icone={<Trash2 size={16} color={cores.texto} />}
+                    />
+                  </View>
+                  {item.descricao ? (
+                    <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>{item.descricao}</Text>
+                  ) : null}
+                  <View style={{ gap: espaco.sm }}>
+                    <Rotulo>Valor cobrado (R$)</Rotulo>
+                    <Campo
+                      testID={`input-service-value-${item.servicoId}`}
+                      valor={item.valorCobrado}
+                      onChange={(texto) => atualizarValorItem(item.servicoId, texto)}
+                      placeholder="0,00"
+                      teclado="decimal-pad"
+                    />
+                  </View>
+                </View>
+              ))}
+
+              <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+                <Text style={{ color: cores.primaria, fontSize: fonte.lg, fontWeight: "700" }}>
+                  Total: {moeda(totalItens)}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </Cartao>
+
+      <Cartao>
+        <View style={{ padding: espaco.xl, gap: espaco.lg }}>
           <Text style={{ color: cores.texto, fontSize: fonte.lg, fontWeight: "600" }}>Atendimento</Text>
 
           <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
@@ -453,14 +622,20 @@ export default function TelaNovaOrdemServico() {
               <Campo testID="input-deadline" valor={prazo} onChange={setPrazo} placeholder="AAAA-MM-DD" />
             </View>
             <View style={{ flex: 1, gap: espaco.sm }}>
-              <Rotulo>Valor estimado</Rotulo>
+              <Rotulo>{itensServico.length > 0 ? "Valor total (itens)" : "Valor estimado"}</Rotulo>
               <Campo
                 testID="input-value"
-                valor={valor}
+                valor={itensServico.length > 0 ? moeda(valorCalculado) : valor}
                 onChange={setValor}
                 placeholder="0,00"
                 teclado="decimal-pad"
+                editavel={itensServico.length === 0}
               />
+              {itensServico.length > 0 ? (
+                <Text style={{ color: cores.suaveTexto, fontSize: fonte.xs }}>
+                  Calculado automaticamente a partir dos serviços adicionados.
+                </Text>
+              ) : null}
             </View>
           </View>
 

@@ -22,6 +22,47 @@ public class RepositorioProduto : IRepositorioProduto
             .ToListAsync(cancelamento);
     }
 
+    public async Task<IReadOnlyList<Produto>> ObterPorCategoriaAsync(string categoria, CancellationToken cancelamento = default)
+    {
+        var termo = categoria.Trim();
+
+        return await _contexto.Produtos
+            .AsNoTracking()
+            .Where(produto => produto.Categoria == termo)
+            .OrderBy(produto => produto.Nome)
+            .ToListAsync(cancelamento);
+    }
+
+    public async Task<IReadOnlyList<(string Nome, int Quantidade)>> ListarCategoriasAsync(CancellationToken cancelamento = default)
+    {
+        var categorias = await _contexto.Produtos
+            .AsNoTracking()
+            .Where(produto => produto.Categoria != null && produto.Categoria != string.Empty)
+            .GroupBy(produto => produto.Categoria)
+            .Select(grupo => new { Nome = grupo.Key, Quantidade = grupo.Count() })
+            .OrderBy(categoria => categoria.Nome)
+            .ToListAsync(cancelamento);
+
+        return categorias
+            .Select(categoria => (categoria.Nome, categoria.Quantidade))
+            .ToList();
+    }
+
+    public async Task<int> RenomearCategoriaAsync(string nomeAtual, string nomeNovo, CancellationToken cancelamento = default)
+    {
+        var produtos = await _contexto.Produtos
+            .Where(produto => produto.Categoria == nomeAtual)
+            .ToListAsync(cancelamento);
+
+        foreach (var produto in produtos)
+        {
+            produto.Categoria = nomeNovo;
+        }
+
+        await _contexto.SaveChangesAsync(cancelamento);
+        return produtos.Count;
+    }
+
     public async Task<Produto?> ObterPorIdAsync(string id, CancellationToken cancelamento = default)
     {
         return await _contexto.Produtos.FirstOrDefaultAsync(produto => produto.Id == id, cancelamento);
