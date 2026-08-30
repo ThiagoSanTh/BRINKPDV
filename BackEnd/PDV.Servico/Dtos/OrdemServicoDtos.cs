@@ -38,6 +38,7 @@ public record OrdemServicoDto(
     DateOnly Data,
     DateOnly Prazo,
     DateOnly? DataSaida,
+    IReadOnlyList<ItemOrdemServicoDto> ItensServico,
     ResultadoWhatsAppDto? WhatsApp = null);
 
 public class OrdemServicoEntradaDto
@@ -54,6 +55,7 @@ public class OrdemServicoEntradaDto
     public string? Status { get; set; }
     public string? Prioridade { get; set; }
     public decimal Valor { get; set; }
+    public List<ItemOrdemServicoEntradaDto>? ItensServico { get; set; }
     public DateOnly? Prazo { get; set; }
     public DateOnly? DataSaida { get; set; }
 }

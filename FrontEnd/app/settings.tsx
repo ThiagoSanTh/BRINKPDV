@@ -15,6 +15,7 @@ import {
   Save,
   Store,
   Trash2,
+  Upload,
   User,
   Users,
 } from "lucide-react-native";
@@ -34,12 +35,12 @@ import { Seletor } from "../componentes/ui/Seletor";
 import { CelulaTabela, LinhaTabela, Tabela } from "../componentes/ui/Tabela";
 import { TituloPagina } from "../componentes/ui/TituloPagina";
 import { api } from "../lib/api";
-import { baixarTexto, escolherImagemBase64 } from "../lib/arquivos";
+import { baixarBlob, escolherArquivo, escolherImagemBase64 } from "../lib/arquivos";
 import { useAutenticacao } from "../lib/autenticacao";
 import { chaves } from "../lib/consultas";
 import { colunas, useLarguraConteudo } from "../lib/layout";
 import { ehGestao, funcoesQuePodeCriar, podeCriarFuncao } from "../lib/permissoes";
-import { Cliente, ConfiguracaoLoja, Usuario } from "../lib/tipos";
+import { BackupResumo, ConfiguracaoLoja, Usuario } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
 import Constants from "expo-constants";
@@ -144,6 +145,12 @@ export default function TelaConfiguracoes() {
     senha: "",
     funcao: "Vendedor",
   });
+  const [carregandoBackup, setCarregandoBackup] = useState(false);
+  const [carregandoImportacao, setCarregandoImportacao] = useState(false);
+  const [carregandoRestauracao, setCarregandoRestauracao] = useState(false);
+  const [dialogoRestaurar, setDialogoRestaurar] = useState(false);
+  const [resumoBackup, setResumoBackup] = useState<BackupResumo | null>(null);
+  const [arquivoBackup, setArquivoBackup] = useState<File | null>(null);
 
   useEffect(() => {
     if (!configuracao) {
@@ -345,34 +352,98 @@ export default function TelaConfiguracoes() {
     }
   }
 
-  async function backup() {
-    const [produtos, vendas, ordens, vendedores, clientes] = await Promise.all([
-      api.obter("/api/produtos"),
-      api.obter("/api/vendas"),
-      api.obter("/api/ordens-servico"),
-      api.obter("/api/vendedores"),
-      api.obter<Cliente[]>("/api/clientes"),
-    ]);
+  async function criarBackup() {
+    if (carregandoBackup) {
+      return;
+    }
 
-    const conteudo = JSON.stringify(
-      { geradoEm: new Date().toISOString(), produtos, vendas, ordens, vendedores, clientes, configuracao },
-      null,
-      2,
-    );
+    setCarregandoBackup(true);
 
-    const baixou = baixarTexto(
-      `brinkpdv-backup-${new Date().toISOString().split("T")[0]}.json`,
-      conteudo,
-      "application/json",
-    );
+    try {
+      const { blob, nomeArquivo } = await api.baixar("/api/backup/criar");
+      const baixou = baixarBlob(nomeArquivo, blob);
 
-    avisar({
-      titulo: baixou ? "Backup gerado" : "Backup indisponível",
-      descricao: baixou
-        ? "O arquivo JSON foi baixado com sucesso"
-        : "O download de arquivos só está disponível na versão web",
-      variante: baixou ? "padrao" : "perigo",
-    });
+      avisar({
+        titulo: baixou ? "Backup gerado" : "Backup indisponível",
+        descricao: baixou
+          ? `O arquivo ${nomeArquivo} foi baixado com sucesso`
+          : "O download de arquivos só está disponível na versão web",
+        variante: baixou ? "padrao" : "perigo",
+      });
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao criar backup",
+        descricao: erro instanceof Error ? erro.message : "Não foi possível gerar o backup.",
+        variante: "perigo",
+      });
+    } finally {
+      setCarregandoBackup(false);
+    }
+  }
+
+  async function importarBackup() {
+    if (carregandoImportacao || carregandoRestauracao) {
+      return;
+    }
+
+    const arquivo = await escolherArquivo(".brinkbackup");
+
+    if (!arquivo) {
+      return;
+    }
+
+    setCarregandoImportacao(true);
+
+    try {
+      const resumo = await api.enviarArquivo<BackupResumo>("/api/backup/validar", arquivo, arquivo.name);
+      setArquivoBackup(arquivo);
+      setResumoBackup(resumo);
+      setDialogoRestaurar(true);
+    } catch (erro) {
+      avisar({
+        titulo: "Backup inválido",
+        descricao: erro instanceof Error ? erro.message : "Não foi possível validar o arquivo.",
+        variante: "perigo",
+      });
+    } finally {
+      setCarregandoImportacao(false);
+    }
+  }
+
+  async function confirmarRestauracao() {
+    if (!arquivoBackup || carregandoRestauracao) {
+      return;
+    }
+
+    setCarregandoRestauracao(true);
+
+    try {
+      const resultado = await api.enviarArquivo<{ sucesso: boolean; mensagem: string }>(
+        "/api/backup/restaurar",
+        arquivoBackup,
+        arquivoBackup.name,
+      );
+
+      await clienteConsultas.invalidateQueries();
+
+      setDialogoRestaurar(false);
+      setResumoBackup(null);
+      setArquivoBackup(null);
+
+      avisar({
+        titulo: resultado.sucesso ? "Backup restaurado" : "Restauração concluída",
+        descricao: resultado.mensagem,
+        variante: resultado.sucesso ? "padrao" : "perigo",
+      });
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao restaurar",
+        descricao: erro instanceof Error ? erro.message : "Não foi possível restaurar o backup.",
+        variante: "perigo",
+      });
+    } finally {
+      setCarregandoRestauracao(false);
+    }
   }
 
   async function abrirAtualizacoes() {
@@ -959,16 +1030,27 @@ export default function TelaConfiguracoes() {
           <TituloSecao icone={<Database size={20} color={cores.primaria} />} texto="Backup do Sistema" />
 
           <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
-            Baixa um JSON com produtos, vendas, ordens de serviço, clientes, vendedores e configurações.
-            A importação do outro PDV da loja será feita em um projeto à parte.
+            Gera um arquivo .brinkbackup com todos os dados do sistema. Importe para validar e restaurar
+            em outra instalação ou após reinstalação.
           </Text>
 
           <View style={{ flexDirection: "row", gap: espaco.lg, flexWrap: "wrap" }}>
             <Botao
               testID="button-backup"
-              titulo="Fazer Backup Agora"
+              titulo="Criar Backup"
+              carregando={carregandoBackup}
+              desabilitado={carregandoBackup || carregandoImportacao || carregandoRestauracao}
               icone={<Download size={16} color={cores.primariaTexto} />}
-              onPress={backup}
+              onPress={criarBackup}
+            />
+            <Botao
+              testID="button-import-backup"
+              titulo="Importar Backup"
+              variante="contorno"
+              carregando={carregandoImportacao}
+              desabilitado={carregandoBackup || carregandoImportacao || carregandoRestauracao}
+              icone={<Upload size={16} color={cores.texto} />}
+              onPress={importarBackup}
             />
           </View>
         </View>
@@ -1020,7 +1102,7 @@ export default function TelaConfiguracoes() {
             "Comissões de vendedores",
             "Relatórios e estatísticas",
             "Impressão de recibos e comprovantes",
-            "Backup dos dados em JSON",
+            "Backup completo em .brinkbackup",
           ].map((nota) => (
             <Text key={nota} style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
               ✅ {nota}
@@ -1119,6 +1201,76 @@ export default function TelaConfiguracoes() {
                 : "Define as permissões do usuário no sistema"}
           </Text>
         </View>
+      </Dialogo>
+
+      <Dialogo
+        aberto={dialogoRestaurar}
+        onFechar={() => {
+          if (!carregandoRestauracao) {
+            setDialogoRestaurar(false);
+            setResumoBackup(null);
+            setArquivoBackup(null);
+          }
+        }}
+        titulo="Restaurar Backup"
+        descricao="Revise o resumo abaixo antes de confirmar. Os dados atuais serão substituídos."
+        testID="dialog-restore-backup"
+        rodape={
+          <>
+            <Botao
+              variante="contorno"
+              titulo="Cancelar"
+              desabilitado={carregandoRestauracao}
+              onPress={() => {
+                setDialogoRestaurar(false);
+                setResumoBackup(null);
+                setArquivoBackup(null);
+              }}
+            />
+            <Botao
+              testID="button-confirm-restore"
+              variante="perigo"
+              titulo="Restaurar Backup"
+              carregando={carregandoRestauracao}
+              desabilitado={!resumoBackup?.compativel || carregandoRestauracao}
+              onPress={confirmarRestauracao}
+            />
+          </>
+        }
+      >
+        {resumoBackup ? (
+          <View style={{ gap: espaco.md }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "600" }}>
+                {resumoBackup.storeName ?? "Backup BRINKPDV"}
+              </Text>
+              <Selo
+                texto={resumoBackup.compativel ? "Compatível" : "Incompatível"}
+                variante={resumoBackup.compativel ? "primario" : "perigo"}
+              />
+            </View>
+
+            <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+              Formato: {resumoBackup.format} · Versão: {resumoBackup.version}
+            </Text>
+            <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+              Criado em: {new Date(resumoBackup.createdAt).toLocaleString("pt-BR")}
+            </Text>
+
+            {resumoBackup.mensagem ? (
+              <Text style={{ color: cores.perigo, fontSize: fonte.sm }}>{resumoBackup.mensagem}</Text>
+            ) : null}
+
+            <View style={{ gap: espaco.xs }}>
+              <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "500" }}>Registros:</Text>
+              {Object.entries(resumoBackup.records).map(([tipo, quantidade]) => (
+                <Text key={tipo} style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+                  {tipo}: {quantidade}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
       </Dialogo>
     </View>
   );

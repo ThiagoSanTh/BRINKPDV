@@ -16,6 +16,7 @@ public class OrdemServico
     public string Status { get; set; } = StatusOrdemServico.Orcamento;
     public string Prioridade { get; set; } = PrioridadesOrdemServico.Media;
     public decimal Valor { get; set; }
+    public List<ItemOrdemServico> ItensServico { get; set; } = [];
     public DateOnly Data { get; set; } = DateOnly.FromDateTime(DateTime.Today);
     public DateOnly Prazo { get; set; } = DateOnly.FromDateTime(DateTime.Today.AddDays(7));
     public DateOnly? DataSaida { get; set; }
@@ -63,6 +64,9 @@ public static class StatusOrdemServico
 
     public static bool EstaEncerrada(string status) =>
         status is Entregue or Cancelada or "Concluída";
+
+    public static bool EstaEmAndamento(string status) =>
+        !EstaEncerrada(Normalizar(status));
 }
 
 public static class PrioridadesOrdemServico

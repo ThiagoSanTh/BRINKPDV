@@ -14,6 +14,7 @@ public static class InjecaoDependencia
         servicos.AddScoped<IRepositorioVenda, RepositorioVenda>();
         servicos.AddScoped<IRepositorioVendedor, RepositorioVendedor>();
         servicos.AddScoped<IRepositorioOrdemServico, RepositorioOrdemServico>();
+        servicos.AddScoped<IRepositorioServico, RepositorioServico>();
         servicos.AddScoped<IRepositorioCliente, RepositorioCliente>();
         servicos.AddScoped<IRepositorioUsuario, RepositorioUsuario>();
         servicos.AddScoped<IRepositorioConfiguracaoLoja, RepositorioConfiguracaoLoja>();
@@ -28,6 +29,8 @@ public static class InjecaoDependencia
         servicos.AddScoped<IServicoVenda, ServicoVenda>();
         servicos.AddScoped<IServicoVendedor, ServicoVendedor>();
         servicos.AddScoped<IServicoOrdemServico, ServicoOrdemServico>();
+        servicos.AddScoped<IServicoServico, ServicoServico>();
+        servicos.AddScoped<IServicoBackup, ServicoBackup>();
         servicos.AddScoped<IServicoCliente, ServicoCliente>();
         servicos.AddHttpClient<IServicoWhatsApp, ServicoWhatsApp>();
         servicos.AddScoped<IServicoUsuario, ServicoUsuario>();

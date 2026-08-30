@@ -19,6 +19,7 @@ import { chaves } from "../../lib/consultas";
 import { dataCurta, moeda } from "../../lib/formato";
 import { colunas, useLarguraConteudo } from "../../lib/layout";
 import { imprimirNotaOs } from "../../lib/nota-os";
+import { estaEmAndamentoOs, estaEncerradaOs, filtroEmAndamento } from "../../lib/status-os";
 import { ConfiguracaoLoja, OrdemServico, statusOrdemServico } from "../../lib/tipos";
 import { compartilharOsWhatsApp } from "../../lib/whatsapp";
 import { useTema } from "../../tema/TemaProvider";
@@ -40,10 +41,6 @@ const variantesPrioridade: Record<string, VarianteSelo> = {
   Alta: "perigo",
 };
 
-function estaEncerrada(status: string) {
-  return status === "Entregue" || status === "Cancelada" || status === "Concluída";
-}
-
 function payloadOrdem(ordem: OrdemServico, extras: Record<string, unknown> = {}) {
   return {
     clienteId: ordem.clienteId,
@@ -60,6 +57,12 @@ function payloadOrdem(ordem: OrdemServico, extras: Record<string, unknown> = {})
     valor: ordem.valor,
     prazo: ordem.prazo,
     dataSaida: ordem.dataSaida,
+    itensServico: (ordem.itensServico ?? []).map((item) => ({
+      servicoId: item.servicoId,
+      nome: item.nome,
+      descricao: item.descricao,
+      valorCobrado: item.valorCobrado,
+    })),
     ...extras,
   };
 }
@@ -104,13 +107,21 @@ export default function TelaOrdensServico() {
           (ordem.tipoAparelho ?? "").toLowerCase().includes(termo) ||
           ordem.problema.toLowerCase().includes(termo);
 
-        return casaBusca && (filtroStatus ? ordem.status === filtroStatus : true);
+        return (
+          casaBusca &&
+          (filtroStatus === null
+            ? true
+            : filtroStatus === filtroEmAndamento
+              ? estaEmAndamentoOs(ordem.status)
+              : ordem.status === filtroStatus)
+        );
       }),
     [ordens, busca, filtroStatus],
   );
 
   const receita = ordens.reduce((soma, ordem) => soma + ordem.valor, 0);
   const entregues = ordens.filter((ordem) => ordem.status === "Entregue" || ordem.status === "Concluída");
+  const emAndamento = ordens.filter((ordem) => estaEmAndamentoOs(ordem.status));
 
   async function persistirStatus(ordem: OrdemServico, status: string) {
     try {
@@ -184,11 +195,11 @@ export default function TelaOrdensServico() {
           <Pressable
             key="andamento"
             testID="card-in-progress-orders"
-            onPress={() => setFiltroStatus("Em Andamento")}
+            onPress={() => setFiltroStatus(filtroEmAndamento)}
           >
             <CartaoResumo
-              titulo={`Em Andamento ${filtroStatus === "Em Andamento" ? "✓" : ""}`}
-              valor={String(ordens.filter((ordem) => ordem.status === "Em Andamento").length)}
+              titulo={`Em Andamento ${filtroStatus === filtroEmAndamento ? "✓" : ""}`}
+              valor={String(emAndamento.length)}
               cor={cores.primaria}
             />
           </Pressable>,
@@ -227,6 +238,7 @@ export default function TelaOrdensServico() {
                 placeholder="Todos os status"
                 opcoes={[
                   { valor: "__todos__", rotulo: "Todos os status" },
+                  { valor: filtroEmAndamento, rotulo: "Em Andamento (ativas)" },
                   ...statusOrdemServico.map((item) => ({ valor: item, rotulo: item })),
                 ]}
               />
@@ -335,7 +347,7 @@ export default function TelaOrdensServico() {
                             onPress={() => compartilhar(ordem)}
                             icone={<Share2 size={16} color={cores.texto} />}
                           />
-                          {!estaEncerrada(ordem.status) ? (
+                          {!estaEncerradaOs(ordem.status) ? (
                             <Botao
                               testID={`button-complete-${ordem.id}`}
                               variante="fantasma"

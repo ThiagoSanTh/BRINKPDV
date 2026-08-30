@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Package, Pencil, Plus, Search, Tag, Trash2 } from "lucide-react-native";
+import { Package, Pencil, Plus, Search, Tag, Trash2, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { useAvisos } from "../componentes/ui/Avisos";
 import { Botao } from "../componentes/ui/Botao";
@@ -13,10 +13,12 @@ import { Selo } from "../componentes/ui/Selo";
 import { CelulaTabela, LinhaTabela, Tabela } from "../componentes/ui/Tabela";
 import { TituloPagina } from "../componentes/ui/TituloPagina";
 import { api } from "../lib/api";
+import { useAutenticacao } from "../lib/autenticacao";
 import { chaves } from "../lib/consultas";
 import { moeda, paraNumero } from "../lib/formato";
 import { colunas, useLarguraConteudo } from "../lib/layout";
-import { Produto, ConfiguracaoLoja } from "../lib/tipos";
+import { ehGestao } from "../lib/permissoes";
+import { ConfiguracaoLoja, Produto } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
 
@@ -44,12 +46,18 @@ export default function TelaProdutos() {
   const { cores, ehDesktop } = useTema();
   const largura = useLarguraConteudo();
   const { avisar } = useAvisos();
+  const { usuario } = useAutenticacao();
   const clienteConsultas = useQueryClient();
+  const gestao = ehGestao(usuario?.funcao);
 
   const [busca, setBusca] = useState("");
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
   const [dialogoNovo, setDialogoNovo] = useState(false);
   const [dialogoEditar, setDialogoEditar] = useState(false);
   const [dialogoExcluir, setDialogoExcluir] = useState(false);
+  const [dialogoRenomear, setDialogoRenomear] = useState(false);
+  const [categoriaRenomear, setCategoriaRenomear] = useState<string | null>(null);
+  const [novoNomeCategoria, setNovoNomeCategoria] = useState("");
   const [selecionado, setSelecionado] = useState<Produto | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(formularioVazio);
 
@@ -76,17 +84,30 @@ export default function TelaProdutos() {
     onSuccess: invalidar,
   });
 
+  const renomearCategoria = useMutation({
+    mutationFn: (dados: { nomeAtual: string; nomeNovo: string }) =>
+      api.atualizar<{ nomeAnterior: string; nomeNovo: string; produtosAtualizados: number }>(
+        "/api/produtos/categorias/renomear",
+        dados,
+      ),
+    onSuccess: invalidar,
+  });
+
   const filtrados = useMemo(
     () =>
       produtos.filter((produto) => {
         const termo = busca.toLowerCase();
-        return (
+        const casaBusca =
           produto.nome.toLowerCase().includes(termo) ||
           produto.sku.toLowerCase().includes(termo) ||
-          produto.categoria.toLowerCase().includes(termo)
-        );
+          produto.categoria.toLowerCase().includes(termo);
+        const casaCategoria =
+          !categoriaSelecionada ||
+          produto.categoria.trim().toLowerCase() === categoriaSelecionada.toLowerCase();
+
+        return casaBusca && casaCategoria;
       }),
-    [produtos, busca],
+    [produtos, busca, categoriaSelecionada],
   );
 
   const categorias = useMemo(() => {
@@ -204,7 +225,49 @@ export default function TelaProdutos() {
     }
   }
 
-  const camposFormulario = (prefixo: string) => (
+  function abrirRenomear(nome: string) {
+    setCategoriaRenomear(nome);
+    setNovoNomeCategoria(nome);
+    setDialogoRenomear(true);
+  }
+
+  async function salvarRenomearCategoria() {
+    if (!categoriaRenomear || !novoNomeCategoria.trim()) {
+      avisar({
+        titulo: "Nome inválido",
+        descricao: "Informe o novo nome da categoria.",
+        variante: "perigo",
+      });
+      return;
+    }
+
+    try {
+      const resultado = await renomearCategoria.mutateAsync({
+        nomeAtual: categoriaRenomear,
+        nomeNovo: novoNomeCategoria.trim(),
+      });
+
+      if (categoriaSelecionada?.toLowerCase() === categoriaRenomear.toLowerCase()) {
+        setCategoriaSelecionada(resultado.nomeNovo);
+      }
+
+      avisar({
+        titulo: "Categoria renomeada",
+        descricao: `${resultado.produtosAtualizados} produto(s) atualizado(s).`,
+      });
+      setDialogoRenomear(false);
+      setCategoriaRenomear(null);
+      setNovoNomeCategoria("");
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao renomear",
+        descricao: erro instanceof Error ? erro.message : "Tente novamente",
+        variante: "perigo",
+      });
+    }
+  }
+
+  const camposFormulario = (prefixo: string, mostrarCodigoBarras: boolean) => (
     <>
       <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
         <View style={{ flex: 1, gap: espaco.sm }}>
@@ -271,15 +334,17 @@ export default function TelaProdutos() {
             teclado="number-pad"
           />
         </View>
-        <View style={{ flex: 1, gap: espaco.sm }}>
-          <Rotulo>Código de Barras</Rotulo>
-          <Campo
-            testID={`input-${prefixo}barcode`}
-            valor={formulario.codigoBarras}
-            onChange={(texto) => setFormulario((atual) => ({ ...atual, codigoBarras: texto }))}
-            placeholder="7891234567890"
-          />
-        </View>
+        {mostrarCodigoBarras ? (
+          <View style={{ flex: 1, gap: espaco.sm }}>
+            <Rotulo>Código de Barras</Rotulo>
+            <Campo
+              testID={`input-${prefixo}barcode`}
+              valor={formulario.codigoBarras}
+              onChange={(texto) => setFormulario((atual) => ({ ...atual, codigoBarras: texto }))}
+              placeholder="7891234567890"
+            />
+          </View>
+        ) : null}
       </View>
     </>
   );
@@ -304,40 +369,96 @@ export default function TelaProdutos() {
 
       {categorias.length > 0 ? (
         <Grade colunas={colunas(largura, 240, 4)} largura={largura} espacamento={espaco.md}>
-          {categorias.map((categoria) => (
-            <Cartao key={categoria.nome} testID={`card-category-${categoria.nome}`}>
-              <View style={{ padding: espaco.md, gap: espaco.sm }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
-                  <View style={{ padding: 6, borderRadius: raio.pequeno, backgroundColor: cores.suave }}>
-                    <Tag size={14} color={cores.primaria} />
-                  </View>
-                  <Text
-                    numberOfLines={1}
-                    style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "600", flex: 1 }}
-                  >
-                    {categoria.nome}
-                  </Text>
-                  <Selo texto={String(categoria.quantidade)} />
-                </View>
+          {categorias.map((categoria) => {
+            const selecionada =
+              categoriaSelecionada?.toLowerCase() === categoria.nome.toLowerCase();
 
-                <View style={{ gap: espaco.xs }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>Estoque</Text>
-                    <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "500" }}>
-                      {`${categoria.estoqueTotal} un.`}
-                    </Text>
+            return (
+              <Pressable
+                key={categoria.nome}
+                testID={`card-category-${categoria.nome}`}
+                onPress={() => setCategoriaSelecionada(categoria.nome)}
+              >
+                <Cartao
+                  estilo={
+                    selecionada
+                      ? { borderColor: cores.primaria, borderWidth: 2 }
+                      : undefined
+                  }
+                >
+                  <View style={{ padding: espaco.md, gap: espaco.sm }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+                      <View style={{ padding: 6, borderRadius: raio.pequeno, backgroundColor: cores.suave }}>
+                        <Tag size={14} color={cores.primaria} />
+                      </View>
+                      <Text
+                        numberOfLines={1}
+                        style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "600", flex: 1 }}
+                      >
+                        {categoria.nome}
+                      </Text>
+                      <Selo texto={String(categoria.quantidade)} />
+                      {gestao ? (
+                        <Botao
+                          testID={`button-rename-category-${categoria.nome}`}
+                          variante="fantasma"
+                          tamanho="icone"
+                          onPress={() => abrirRenomear(categoria.nome)}
+                          icone={<Pencil size={14} color={cores.texto} />}
+                        />
+                      ) : null}
+                    </View>
+
+                    <View style={{ gap: espaco.xs }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>Estoque</Text>
+                        <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "500" }}>
+                          {`${categoria.estoqueTotal} un.`}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>Valor Total</Text>
+                        <Text style={{ color: cores.primaria, fontSize: fonte.base, fontWeight: "600" }}>
+                          {moeda(categoria.valorTotal)}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>Valor Total</Text>
-                    <Text style={{ color: cores.primaria, fontSize: fonte.base, fontWeight: "600" }}>
-                      {moeda(categoria.valorTotal)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </Cartao>
-          ))}
+                </Cartao>
+              </Pressable>
+            );
+          })}
         </Grade>
+      ) : null}
+
+      {categoriaSelecionada ? (
+        <Cartao testID="banner-category-filter">
+          <View
+            style={{
+              padding: espaco.md,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: espaco.md,
+            }}
+          >
+            <View style={{ flex: 1, gap: espaco.xs }}>
+              <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "600" }}>
+                Categoria: {categoriaSelecionada}
+              </Text>
+              <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+                {filtrados.length} produto(s) encontrado(s)
+              </Text>
+            </View>
+            <Botao
+              testID="button-clear-category-filter"
+              variante="contorno"
+              titulo="Limpar filtro"
+              icone={<X size={16} color={cores.texto} />}
+              onPress={() => setCategoriaSelecionada(null)}
+            />
+          </View>
+        </Cartao>
       ) : null}
 
       <Cartao>
@@ -393,16 +514,10 @@ export default function TelaProdutos() {
                       <CelulaTabela proporcao={1.6}>
                         <Selo texto={produto.categoria} />
                       </CelulaTabela>
-                      <CelulaTabela
-                        proporcao={1.3}
-                        estiloTexto={{ color: cores.suaveTexto }}
-                      >
+                      <CelulaTabela proporcao={1.3} estiloTexto={{ color: cores.suaveTexto }}>
                         {moeda(custo)}
                       </CelulaTabela>
-                      <CelulaTabela
-                        proporcao={1.3}
-                        estiloTexto={{ fontWeight: "600" }}
-                      >
+                      <CelulaTabela proporcao={1.3} estiloTexto={{ fontWeight: "600" }}>
                         {moeda(produto.preco)}
                       </CelulaTabela>
                       <CelulaTabela proporcao={1}>
@@ -490,7 +605,7 @@ export default function TelaProdutos() {
           </>
         }
       >
-        {camposFormulario("")}
+        {camposFormulario("", false)}
       </Dialogo>
 
       <Dialogo
@@ -510,7 +625,7 @@ export default function TelaProdutos() {
           </>
         }
       >
-        {camposFormulario("edit-")}
+        {camposFormulario("edit-", true)}
       </Dialogo>
 
       <Dialogo
@@ -532,6 +647,35 @@ export default function TelaProdutos() {
           </>
         }
       />
+
+      <Dialogo
+        aberto={dialogoRenomear}
+        onFechar={() => setDialogoRenomear(false)}
+        titulo="Renomear Categoria"
+        descricao={`Altere o nome da categoria "${categoriaRenomear ?? ""}". Todos os produtos serão atualizados.`}
+        testID="dialog-rename-category"
+        rodape={
+          <>
+            <Botao variante="contorno" titulo="Cancelar" onPress={() => setDialogoRenomear(false)} />
+            <Botao
+              testID="button-save-rename-category"
+              titulo="Salvar"
+              carregando={renomearCategoria.isPending}
+              onPress={salvarRenomearCategoria}
+            />
+          </>
+        }
+      >
+        <View style={{ gap: espaco.sm }}>
+          <Rotulo>Novo nome</Rotulo>
+          <Campo
+            testID="input-rename-category"
+            valor={novoNomeCategoria}
+            onChange={setNovoNomeCategoria}
+            placeholder="Nome da categoria"
+          />
+        </View>
+      </Dialogo>
     </View>
   );
 }

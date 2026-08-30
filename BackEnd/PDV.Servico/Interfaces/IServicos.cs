@@ -5,7 +5,11 @@ namespace PDV.Servico.Interfaces;
 
 public interface IServicoProduto
 {
-    Task<IReadOnlyList<ProdutoDto>> ListarAsync(CancellationToken cancelamento = default);
+    Task<IReadOnlyList<ProdutoDto>> ListarAsync(string? categoria = null, CancellationToken cancelamento = default);
+
+    Task<IReadOnlyList<CategoriaResumoDto>> ListarCategoriasAsync(CancellationToken cancelamento = default);
+
+    Task<RenomearCategoriaResultadoDto> RenomearCategoriaAsync(RenomearCategoriaDto entrada, CancellationToken cancelamento = default);
 
     Task<ProdutoDto?> ObterAsync(string id, CancellationToken cancelamento = default);
 
@@ -48,6 +52,7 @@ public interface IServicoOrdemServico
         string? busca = null,
         string? status = null,
         string? clienteId = null,
+        bool emAndamento = false,
         CancellationToken cancelamento = default);
 
     Task<IReadOnlyList<OrdemServicoDto>> ListarPorClienteAsync(string clienteId, CancellationToken cancelamento = default);
@@ -104,4 +109,26 @@ public interface IServicoCaixa
     Task<ResumoCaixaDto> ObterResumoAsync(CancellationToken cancelamento = default);
 
     Task<MovimentoCaixaDto> RegistrarAsync(MovimentoCaixaEntradaDto entrada, CancellationToken cancelamento = default);
+}
+
+public interface IServicoServico
+{
+    Task<IReadOnlyList<ServicoCatalogoDto>> ListarAsync(CancellationToken cancelamento = default);
+
+    Task<ServicoCatalogoDto?> ObterAsync(string id, CancellationToken cancelamento = default);
+
+    Task<ServicoCatalogoDto> CriarAsync(ServicoCatalogoEntradaDto entrada, CancellationToken cancelamento = default);
+
+    Task<ServicoCatalogoDto?> AtualizarAsync(string id, ServicoCatalogoEntradaDto entrada, CancellationToken cancelamento = default);
+
+    Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default);
+}
+
+public interface IServicoBackup
+{
+    Task<(byte[] Arquivo, string NomeArquivo)> CriarAsync(CancellationToken cancelamento = default);
+
+    Task<BackupResumoDto> ValidarAsync(Stream arquivo, CancellationToken cancelamento = default);
+
+    Task<RestaurarBackupResultadoDto> RestaurarAsync(Stream arquivo, CancellationToken cancelamento = default);
 }

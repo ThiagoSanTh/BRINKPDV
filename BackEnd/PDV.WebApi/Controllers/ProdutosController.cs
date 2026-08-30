@@ -19,9 +19,26 @@ public class ProdutosController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ProdutoDto>>> Listar(CancellationToken cancelamento)
+    public async Task<ActionResult<IReadOnlyList<ProdutoDto>>> Listar(
+        [FromQuery] string? categoria,
+        CancellationToken cancelamento)
     {
-        return Ok(await _servico.ListarAsync(cancelamento));
+        return Ok(await _servico.ListarAsync(categoria, cancelamento));
+    }
+
+    [HttpGet("categorias")]
+    public async Task<ActionResult<IReadOnlyList<CategoriaResumoDto>>> ListarCategorias(CancellationToken cancelamento)
+    {
+        return Ok(await _servico.ListarCategoriasAsync(cancelamento));
+    }
+
+    [HttpPut("categorias/renomear")]
+    [Authorize(Roles = FuncoesUsuario.PapeisGestao)]
+    public async Task<ActionResult<RenomearCategoriaResultadoDto>> RenomearCategoria(
+        RenomearCategoriaDto entrada,
+        CancellationToken cancelamento)
+    {
+        return Ok(await _servico.RenomearCategoriaAsync(entrada, cancelamento));
     }
 
     [HttpGet("{id}")]

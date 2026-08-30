@@ -21,6 +21,8 @@ public class PdvDbContext : DbContext
 
     public DbSet<OrdemServico> OrdensServico => Set<OrdemServico>();
 
+    public DbSet<ServicoCatalogo> Servicos => Set<ServicoCatalogo>();
+
     public DbSet<ConfiguracaoLoja> ConfiguracoesLoja => Set<ConfiguracaoLoja>();
 
     public DbSet<MovimentoCaixa> MovimentosCaixa => Set<MovimentoCaixa>();
