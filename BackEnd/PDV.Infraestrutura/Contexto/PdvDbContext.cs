@@ -13,6 +13,8 @@ public class PdvDbContext : DbContext
 
     public DbSet<Produto> Produtos => Set<Produto>();
 
+    public DbSet<Servico> Servicos => Set<Servico>();
+
     public DbSet<Vendedor> Vendedores => Set<Vendedor>();
 
     public DbSet<Venda> Vendas => Set<Venda>();

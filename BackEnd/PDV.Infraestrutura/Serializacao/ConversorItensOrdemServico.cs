@@ -6,9 +6,9 @@ using PDV.Dominio.Entidades;
 
 namespace PDV.Infraestrutura.Serializacao;
 
-public class ConversorItensVenda : ValueConverter<List<ItemVenda>, string>
+public class ConversorItensOrdemServico : ValueConverter<List<ItemOrdemServico>, string>
 {
-    public ConversorItensVenda()
+    public ConversorItensOrdemServico()
         : base(
             itens => Serializar(itens),
             texto => Desserializar(texto))
@@ -20,49 +20,47 @@ public class ConversorItensVenda : ValueConverter<List<ItemVenda>, string>
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    private static string Serializar(List<ItemVenda> itens)
+    private static string Serializar(List<ItemOrdemServico> itens)
     {
-        var persistidos = itens.Select(item => new ItemVendaPersistido
+        var persistidos = itens.Select(item => new ItemOrdemServicoPersistido
         {
             ProductId = item.ProdutoId,
             ServiceId = item.ServicoId,
-            Type = string.IsNullOrWhiteSpace(item.Tipo) ? TiposItemTransacional.Produto : item.Tipo,
+            Type = string.IsNullOrWhiteSpace(item.Tipo) ? TiposItemTransacional.Servico : item.Tipo,
             Name = item.Nome,
             Quantity = item.Quantidade,
             Price = item.PrecoUnitario,
-            Discount = item.Desconto,
         });
 
         return JsonSerializer.Serialize(persistidos, Opcoes);
     }
 
-    private static List<ItemVenda> Desserializar(string texto)
+    private static List<ItemOrdemServico> Desserializar(string texto)
     {
         if (string.IsNullOrWhiteSpace(texto))
         {
             return [];
         }
 
-        var persistidos = JsonSerializer.Deserialize<List<ItemVendaPersistido>>(texto, Opcoes) ?? [];
+        var persistidos = JsonSerializer.Deserialize<List<ItemOrdemServicoPersistido>>(texto, Opcoes) ?? [];
 
         return persistidos
-            .Select(item => new ItemVenda
+            .Select(item => new ItemOrdemServico
             {
-                ProdutoId = item.ProductId ?? string.Empty,
+                ProdutoId = item.ProductId,
                 ServicoId = item.ServiceId,
-                Tipo = string.IsNullOrWhiteSpace(item.Type) ? TiposItemTransacional.Produto : item.Type,
+                Tipo = string.IsNullOrWhiteSpace(item.Type) ? TiposItemTransacional.Servico : item.Type,
                 Nome = item.Name ?? string.Empty,
-                Quantidade = item.Quantity,
+                Quantidade = item.Quantity <= 0 ? 1 : item.Quantity,
                 PrecoUnitario = item.Price,
-                Desconto = item.Discount,
             })
             .ToList();
     }
 }
 
-public class ComparadorItensVenda : ValueComparer<List<ItemVenda>>
+public class ComparadorItensOrdemServico : ValueComparer<List<ItemOrdemServico>>
 {
-    public ComparadorItensVenda()
+    public ComparadorItensOrdemServico()
         : base(
             (esquerda, direita) => SaoIguais(esquerda, direita),
             itens => CalcularHash(itens),
@@ -70,7 +68,7 @@ public class ComparadorItensVenda : ValueComparer<List<ItemVenda>>
     {
     }
 
-    private static bool SaoIguais(List<ItemVenda>? esquerda, List<ItemVenda>? direita)
+    private static bool SaoIguais(List<ItemOrdemServico>? esquerda, List<ItemOrdemServico>? direita)
     {
         if (esquerda is null || direita is null)
         {
@@ -89,12 +87,11 @@ public class ComparadorItensVenda : ValueComparer<List<ItemVenda>>
                 a.Tipo == b.Tipo &&
                 a.Nome == b.Nome &&
                 a.Quantidade == b.Quantidade &&
-                a.PrecoUnitario == b.PrecoUnitario &&
-                a.Desconto == b.Desconto)
+                a.PrecoUnitario == b.PrecoUnitario)
             .All(iguais => iguais);
     }
 
-    private static int CalcularHash(List<ItemVenda> itens)
+    private static int CalcularHash(List<ItemOrdemServico> itens)
     {
         var hash = new HashCode();
 
@@ -106,13 +103,12 @@ public class ComparadorItensVenda : ValueComparer<List<ItemVenda>>
             hash.Add(item.Nome);
             hash.Add(item.Quantidade);
             hash.Add(item.PrecoUnitario);
-            hash.Add(item.Desconto);
         }
 
         return hash.ToHashCode();
     }
 
-    private static ItemVenda Clonar(ItemVenda item) => new()
+    private static ItemOrdemServico Clonar(ItemOrdemServico item) => new()
     {
         ProdutoId = item.ProdutoId,
         ServicoId = item.ServicoId,
@@ -120,11 +116,10 @@ public class ComparadorItensVenda : ValueComparer<List<ItemVenda>>
         Nome = item.Nome,
         Quantidade = item.Quantidade,
         PrecoUnitario = item.PrecoUnitario,
-        Desconto = item.Desconto,
     };
 }
 
-internal sealed class ItemVendaPersistido
+internal sealed class ItemOrdemServicoPersistido
 {
     [JsonPropertyName("productId")]
     public string? ProductId { get; set; }
@@ -143,7 +138,4 @@ internal sealed class ItemVendaPersistido
 
     [JsonPropertyName("price")]
     public decimal Price { get; set; }
-
-    [JsonPropertyName("discount")]
-    public decimal Discount { get; set; }
 }

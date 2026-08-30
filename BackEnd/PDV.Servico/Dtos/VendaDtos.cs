@@ -2,6 +2,8 @@ namespace PDV.Servico.Dtos;
 
 public record ItemVendaDto(
     string ProdutoId,
+    string? ServicoId,
+    string Tipo,
     string Nome,
     int Quantidade,
     decimal PrecoUnitario,
@@ -22,7 +24,9 @@ public record VendaDto(
 
 public class ItemVendaEntradaDto
 {
-    public string ProdutoId { get; set; } = string.Empty;
+    public string? ProdutoId { get; set; }
+    public string? ServicoId { get; set; }
+    public string Tipo { get; set; } = "produto";
     public int Quantidade { get; set; }
     public decimal? PrecoUnitario { get; set; }
     public decimal Desconto { get; set; }

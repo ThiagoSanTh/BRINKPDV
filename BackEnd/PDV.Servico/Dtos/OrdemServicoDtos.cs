@@ -35,6 +35,7 @@ public record OrdemServicoDto(
     string Status,
     string Prioridade,
     decimal Valor,
+    IReadOnlyList<ItemOrdemServicoDto> Itens,
     DateOnly Data,
     DateOnly Prazo,
     DateOnly? DataSaida,
@@ -54,6 +55,26 @@ public class OrdemServicoEntradaDto
     public string? Status { get; set; }
     public string? Prioridade { get; set; }
     public decimal Valor { get; set; }
+    public List<ItemOrdemServicoEntradaDto>? Itens { get; set; }
     public DateOnly? Prazo { get; set; }
     public DateOnly? DataSaida { get; set; }
+}
+
+public record ItemOrdemServicoDto(
+    string? ProdutoId,
+    string? ServicoId,
+    string Tipo,
+    string Nome,
+    int Quantidade,
+    decimal PrecoUnitario,
+    decimal Total);
+
+public class ItemOrdemServicoEntradaDto
+{
+    public string? ProdutoId { get; set; }
+    public string? ServicoId { get; set; }
+    public string Tipo { get; set; } = "servico";
+    public string? Nome { get; set; }
+    public int Quantidade { get; set; } = 1;
+    public decimal PrecoUnitario { get; set; }
 }

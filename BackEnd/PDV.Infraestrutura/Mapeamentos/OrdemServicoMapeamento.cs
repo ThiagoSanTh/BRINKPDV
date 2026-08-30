@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PDV.Dominio.Entidades;
+using PDV.Infraestrutura.Serializacao;
 
 namespace PDV.Infraestrutura.Mapeamentos;
 
@@ -86,6 +87,13 @@ public class OrdemServicoMapeamento : IEntityTypeConfiguration<OrdemServico>
         builder.Property(ordem => ordem.Valor)
             .HasColumnName("value")
             .HasColumnType("numeric(10,2)")
+            .IsRequired();
+
+        builder.Property(ordem => ordem.Itens)
+            .HasColumnName("items")
+            .HasColumnType("text")
+            .HasDefaultValue("[]")
+            .HasConversion(new ConversorItensOrdemServico(), new ComparadorItensOrdemServico())
             .IsRequired();
 
         builder.Property(ordem => ordem.Data)

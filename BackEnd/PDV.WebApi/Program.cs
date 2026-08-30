@@ -57,7 +57,8 @@ builder.Services.AddCors(opcoes =>
     opcoes.AddDefaultPolicy(politica => politica
         .AllowAnyOrigin()
         .AllowAnyHeader()
-        .AllowAnyMethod());
+        .AllowAnyMethod()
+        .WithExposedHeaders("Content-Disposition", "X-Brinkpdv-Backup-Manifest"));
 });
 
 builder.Services.AddControllers();

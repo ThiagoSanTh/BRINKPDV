@@ -11,13 +11,19 @@ public class ServicoOrdemServico : IServicoOrdemServico
 {
     private readonly IRepositorioOrdemServico _repositorio;
     private readonly IRepositorioCliente _repositorioCliente;
+    private readonly IRepositorioProduto _repositorioProduto;
+    private readonly IRepositorioServico _repositorioServico;
 
     public ServicoOrdemServico(
         IRepositorioOrdemServico repositorio,
-        IRepositorioCliente repositorioCliente)
+        IRepositorioCliente repositorioCliente,
+        IRepositorioProduto repositorioProduto,
+        IRepositorioServico repositorioServico)
     {
         _repositorio = repositorio;
         _repositorioCliente = repositorioCliente;
+        _repositorioProduto = repositorioProduto;
+        _repositorioServico = repositorioServico;
     }
 
     public async Task<IReadOnlyList<OrdemServicoDto>> ListarAsync(
@@ -55,6 +61,7 @@ public class ServicoOrdemServico : IServicoOrdemServico
         var marca = (entrada.Marca ?? string.Empty).Trim();
         var modelo = (entrada.Modelo ?? string.Empty).Trim();
         var tipo = string.IsNullOrWhiteSpace(entrada.TipoAparelho) ? TiposAparelho.Outro : entrada.TipoAparelho.Trim();
+        var itens = await ResolverItensAsync(entrada.Itens ?? [], cancelamento);
         var aparelho = string.IsNullOrWhiteSpace(entrada.Aparelho)
             ? $"{marca} {modelo}".Trim()
             : entrada.Aparelho.Trim();
@@ -75,7 +82,8 @@ public class ServicoOrdemServico : IServicoOrdemServico
             Problema = entrada.Problema!.Trim(),
             Status = status,
             Prioridade = entrada.Prioridade ?? PrioridadesOrdemServico.Media,
-            Valor = entrada.Valor,
+            Valor = itens.Count > 0 ? itens.Sum(item => item.Total) : entrada.Valor,
+            Itens = itens,
             Data = hoje,
             Prazo = entrada.Prazo ?? hoje.AddDays(7),
             DataSaida = StatusOrdemServico.EstaEncerrada(status)
@@ -106,6 +114,9 @@ public class ServicoOrdemServico : IServicoOrdemServico
         var marca = string.IsNullOrWhiteSpace(entrada.Marca) ? existente.Marca : entrada.Marca.Trim();
         var modelo = string.IsNullOrWhiteSpace(entrada.Modelo) ? existente.Modelo : entrada.Modelo.Trim();
         var tipo = string.IsNullOrWhiteSpace(entrada.TipoAparelho) ? existente.TipoAparelho : entrada.TipoAparelho.Trim();
+        var itens = entrada.Itens is null
+            ? existente.Itens
+            : await ResolverItensAsync(entrada.Itens, cancelamento);
         var aparelho = string.IsNullOrWhiteSpace(entrada.Aparelho)
             ? $"{marca} {modelo}".Trim()
             : entrada.Aparelho.Trim();
@@ -123,7 +134,8 @@ public class ServicoOrdemServico : IServicoOrdemServico
         existente.Problema = string.IsNullOrWhiteSpace(entrada.Problema) ? existente.Problema : entrada.Problema.Trim();
         existente.Status = status;
         existente.Prioridade = entrada.Prioridade ?? existente.Prioridade;
-        existente.Valor = entrada.Valor;
+        existente.Itens = itens;
+        existente.Valor = itens.Count > 0 ? itens.Sum(item => item.Total) : entrada.Valor;
         existente.Prazo = entrada.Prazo ?? existente.Prazo;
         existente.DataSaida = status == StatusOrdemServico.Entregue
             ? entrada.DataSaida ?? existente.DataSaida ?? DateOnly.FromDateTime(DateTime.Today)
@@ -213,6 +225,83 @@ public class ServicoOrdemServico : IServicoOrdemServico
         }
 
         throw new RegraNegocioException("Informe o cliente da ordem de serviço com um telefone válido.");
+    }
+
+    private async Task<List<ItemOrdemServico>> ResolverItensAsync(
+        List<ItemOrdemServicoEntradaDto> entradas,
+        CancellationToken cancelamento)
+    {
+        var itens = new List<ItemOrdemServico>();
+
+        foreach (var entrada in entradas)
+        {
+            var tipo = string.IsNullOrWhiteSpace(entrada.Tipo)
+                ? TiposItemTransacional.Servico
+                : entrada.Tipo.Trim().ToLower();
+
+            if (!TiposItemTransacional.EhValido(tipo))
+            {
+                throw new RegraNegocioException($"Tipo de item inválido: {entrada.Tipo}.");
+            }
+
+            if (entrada.Quantidade <= 0)
+            {
+                throw new RegraNegocioException("A quantidade de cada item da OS deve ser maior que zero.");
+            }
+
+            if (tipo == TiposItemTransacional.Servico)
+            {
+                if (string.IsNullOrWhiteSpace(entrada.ServicoId))
+                {
+                    throw new RegraNegocioException("Informe o serviço do item da OS.");
+                }
+
+                var servico = await _repositorioServico.ObterPorIdAsync(entrada.ServicoId, cancelamento)
+                    ?? throw new RecursoNaoEncontradoException($"Serviço {entrada.ServicoId} não encontrado.");
+
+                if (entrada.PrecoUnitario <= 0)
+                {
+                    throw new RegraNegocioException($"Informe o valor cobrado para {servico.Nome}.");
+                }
+
+                itens.Add(new ItemOrdemServico
+                {
+                    ServicoId = servico.Id,
+                    Tipo = TiposItemTransacional.Servico,
+                    Nome = servico.Nome,
+                    Quantidade = entrada.Quantidade,
+                    PrecoUnitario = entrada.PrecoUnitario,
+                });
+
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(entrada.ProdutoId))
+            {
+                throw new RegraNegocioException("Informe o produto do item da OS.");
+            }
+
+            var produto = await _repositorioProduto.ObterPorIdAsync(entrada.ProdutoId, cancelamento)
+                ?? throw new RecursoNaoEncontradoException($"Produto {entrada.ProdutoId} não encontrado.");
+
+            var preco = entrada.PrecoUnitario > 0 ? entrada.PrecoUnitario : produto.Preco;
+
+            if (preco <= 0)
+            {
+                throw new RegraNegocioException($"Informe o valor cobrado para {produto.Nome}.");
+            }
+
+            itens.Add(new ItemOrdemServico
+            {
+                ProdutoId = produto.Id,
+                Tipo = TiposItemTransacional.Produto,
+                Nome = produto.Nome,
+                Quantidade = entrada.Quantidade,
+                PrecoUnitario = preco,
+            });
+        }
+
+        return itens;
     }
 
     private static void Validar(OrdemServicoEntradaDto entrada, bool atualizacao = false)

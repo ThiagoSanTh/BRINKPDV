@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Package, Pencil, Plus, Search, Tag, Trash2 } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { useAvisos } from "../componentes/ui/Avisos";
 import { Botao } from "../componentes/ui/Botao";
@@ -16,7 +16,7 @@ import { api } from "../lib/api";
 import { chaves } from "../lib/consultas";
 import { moeda, paraNumero } from "../lib/formato";
 import { colunas, useLarguraConteudo } from "../lib/layout";
-import { Produto, ConfiguracaoLoja } from "../lib/tipos";
+import { CategoriaProduto, ConfiguracaoLoja, Produto } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
 
@@ -49,15 +49,30 @@ export default function TelaProdutos() {
   const [busca, setBusca] = useState("");
   const [dialogoNovo, setDialogoNovo] = useState(false);
   const [dialogoEditar, setDialogoEditar] = useState(false);
+  const [dialogoEditarCategoria, setDialogoEditarCategoria] = useState(false);
   const [dialogoExcluir, setDialogoExcluir] = useState(false);
   const [selecionado, setSelecionado] = useState<Produto | null>(null);
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
+  const [nomeCategoria, setNomeCategoria] = useState("");
+  const [mostrarCodigoBarras, setMostrarCodigoBarras] = useState(false);
   const [formulario, setFormulario] = useState<Formulario>(formularioVazio);
 
   const { data: produtos = [] } = useQuery<Produto[]>({ queryKey: chaves.produtos });
+  const { data: categorias = [] } = useQuery<CategoriaProduto[]>({ queryKey: chaves.categoriasProdutos });
+  const { data: produtosCategoria = [] } = useQuery<Produto[]>({
+    queryKey: ["produtos-categoria", categoriaSelecionada],
+    enabled: Boolean(categoriaSelecionada),
+    queryFn: () =>
+      api.obter<Produto[]>(
+        `/api/produtos/categorias/${encodeURIComponent(categoriaSelecionada ?? "")}/produtos`,
+      ),
+  });
   const { data: configuracao } = useQuery<ConfiguracaoLoja>({ queryKey: chaves.configuracaoLoja });
 
   function invalidar() {
     clienteConsultas.invalidateQueries({ queryKey: chaves.produtos });
+    clienteConsultas.invalidateQueries({ queryKey: chaves.categoriasProdutos });
+    clienteConsultas.invalidateQueries({ queryKey: ["produtos-categoria"] });
   }
 
   const criar = useMutation({
@@ -76,9 +91,17 @@ export default function TelaProdutos() {
     onSuccess: invalidar,
   });
 
+  const atualizarCategoria = useMutation({
+    mutationFn: ({ atual, nome }: { atual: string; nome: string }) =>
+      api.atualizar<CategoriaProduto>(`/api/produtos/categorias/${encodeURIComponent(atual)}`, { nome }),
+    onSuccess: invalidar,
+  });
+
+  const baseProdutos = categoriaSelecionada ? produtosCategoria : produtos;
+
   const filtrados = useMemo(
     () =>
-      produtos.filter((produto) => {
+      baseProdutos.filter((produto) => {
         const termo = busca.toLowerCase();
         return (
           produto.nome.toLowerCase().includes(termo) ||
@@ -86,29 +109,8 @@ export default function TelaProdutos() {
           produto.categoria.toLowerCase().includes(termo)
         );
       }),
-    [produtos, busca],
+    [baseProdutos, busca],
   );
-
-  const categorias = useMemo(() => {
-    const mapa = produtos.reduce<
-      Record<string, { nome: string; quantidade: number; valorTotal: number; estoqueTotal: number }>
-    >((acumulado, produto) => {
-      const nome = produto.categoria.trim();
-      const chave = nome.toLowerCase();
-
-      if (!acumulado[chave]) {
-        acumulado[chave] = { nome, quantidade: 0, valorTotal: 0, estoqueTotal: 0 };
-      }
-
-      acumulado[chave].quantidade += 1;
-      acumulado[chave].valorTotal += produto.preco * produto.estoque;
-      acumulado[chave].estoqueTotal += produto.estoque;
-
-      return acumulado;
-    }, {});
-
-    return Object.values(mapa).sort((a, b) => b.quantidade - a.quantidade);
-  }, [produtos]);
 
   function corpoFormulario() {
     return {
@@ -204,6 +206,34 @@ export default function TelaProdutos() {
     }
   }
 
+  async function salvarCategoria() {
+    if (!categoriaSelecionada) {
+      return;
+    }
+
+    if (!nomeCategoria.trim()) {
+      avisar({ titulo: "Nome obrigatório", descricao: "Informe o novo nome da categoria.", variante: "perigo" });
+      return;
+    }
+
+    try {
+      const categoria = await atualizarCategoria.mutateAsync({
+        atual: categoriaSelecionada,
+        nome: nomeCategoria.trim(),
+      });
+      setCategoriaSelecionada(categoria.nome);
+      setNomeCategoria(categoria.nome);
+      setDialogoEditarCategoria(false);
+      avisar({ titulo: "Categoria atualizada", descricao: "Os produtos vinculados foram atualizados." });
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao atualizar categoria",
+        descricao: erro instanceof Error ? erro.message : "Não foi possível salvar a categoria.",
+        variante: "perigo",
+      });
+    }
+  }
+
   const camposFormulario = (prefixo: string) => (
     <>
       <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
@@ -260,19 +290,20 @@ export default function TelaProdutos() {
         </View>
       </View>
 
-      <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
-        <View style={{ flex: 1, gap: espaco.sm }}>
-          <Rotulo>{prefixo ? "Estoque" : "Estoque Inicial"}</Rotulo>
-          <Campo
-            testID={`input-${prefixo}stock`}
-            valor={formulario.estoque}
-            onChange={(texto) => setFormulario((atual) => ({ ...atual, estoque: texto }))}
-            placeholder="0"
-            teclado="number-pad"
-          />
-        </View>
-        <View style={{ flex: 1, gap: espaco.sm }}>
-          <Rotulo>Código de Barras</Rotulo>
+      <View style={{ gap: espaco.sm }}>
+        <Rotulo>{prefixo ? "Estoque" : "Estoque Inicial"}</Rotulo>
+        <Campo
+          testID={`input-${prefixo}stock`}
+          valor={formulario.estoque}
+          onChange={(texto) => setFormulario((atual) => ({ ...atual, estoque: texto }))}
+          placeholder="0"
+          teclado="number-pad"
+        />
+      </View>
+
+      {mostrarCodigoBarras ? (
+        <View style={{ gap: espaco.sm }}>
+          <Rotulo>Código de barras (opcional para leitor no PDV)</Rotulo>
           <Campo
             testID={`input-${prefixo}barcode`}
             valor={formulario.codigoBarras}
@@ -280,7 +311,14 @@ export default function TelaProdutos() {
             placeholder="7891234567890"
           />
         </View>
-      </View>
+      ) : (
+        <Botao
+          testID={`button-${prefixo}show-barcode`}
+          variante="contorno"
+          titulo={formulario.codigoBarras ? "Editar código de barras" : "Adicionar código de barras"}
+          onPress={() => setMostrarCodigoBarras(true)}
+        />
+      )}
     </>
   );
 
@@ -296,6 +334,7 @@ export default function TelaProdutos() {
             icone={<Plus size={16} color={cores.primariaTexto} />}
             onPress={() => {
               setFormulario(formularioVazio);
+              setMostrarCodigoBarras(false);
               setDialogoNovo(true);
             }}
           />
@@ -306,7 +345,10 @@ export default function TelaProdutos() {
         <Grade colunas={colunas(largura, 240, 4)} largura={largura} espacamento={espaco.md}>
           {categorias.map((categoria) => (
             <Cartao key={categoria.nome} testID={`card-category-${categoria.nome}`}>
-              <View style={{ padding: espaco.md, gap: espaco.sm }}>
+              <Pressable
+                onPress={() => setCategoriaSelecionada((atual) => (atual === categoria.nome ? null : categoria.nome))}
+                style={{ padding: espaco.md, gap: espaco.sm }}
+              >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
                   <View style={{ padding: 6, borderRadius: raio.pequeno, backgroundColor: cores.suave }}>
                     <Tag size={14} color={cores.primaria} />
@@ -317,7 +359,19 @@ export default function TelaProdutos() {
                   >
                     {categoria.nome}
                   </Text>
+                  {categoriaSelecionada === categoria.nome ? <Selo texto="Selecionada" variante="primario" /> : null}
                   <Selo texto={String(categoria.quantidade)} />
+                  <Botao
+                    testID={`button-edit-category-${categoria.nome}`}
+                    variante="fantasma"
+                    tamanho="icone"
+                    onPress={() => {
+                      setCategoriaSelecionada(categoria.nome);
+                      setNomeCategoria(categoria.nome);
+                      setDialogoEditarCategoria(true);
+                    }}
+                    icone={<Pencil size={14} color={cores.texto} />}
+                  />
                 </View>
 
                 <View style={{ gap: espaco.xs }}>
@@ -334,7 +388,7 @@ export default function TelaProdutos() {
                     </Text>
                   </View>
                 </View>
-              </View>
+              </Pressable>
             </Cartao>
           ))}
         </Grade>
@@ -346,9 +400,30 @@ export default function TelaProdutos() {
             testID="input-product-search"
             valor={busca}
             onChange={setBusca}
-            placeholder="Buscar por nome, SKU ou categoria..."
+            placeholder={
+              categoriaSelecionada
+                ? `Buscar em ${categoriaSelecionada} por nome ou SKU...`
+                : "Buscar por nome, SKU ou categoria..."
+            }
             iconeEsquerda={<Search size={16} color={cores.suaveTexto} />}
           />
+
+          {categoriaSelecionada ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm, flexWrap: "wrap" }}>
+              <Selo
+                testID="badge-selected-category"
+                texto={`Categoria: ${categoriaSelecionada} (${filtrados.length})`}
+                variante="primario"
+              />
+              <Botao
+                testID="button-clear-category"
+                variante="fantasma"
+                tamanho="pequeno"
+                titulo="Mostrar todos"
+                onPress={() => setCategoriaSelecionada(null)}
+              />
+            </View>
+          ) : null}
 
           <View style={{ borderWidth: 1, borderColor: cores.borda, borderRadius: raio.medio }}>
             <View style={{ paddingHorizontal: espaco.lg }}>
@@ -441,6 +516,7 @@ export default function TelaProdutos() {
                                 estoque: String(produto.estoque),
                                 codigoBarras: produto.codigoBarras ?? "",
                               });
+                              setMostrarCodigoBarras(Boolean(produto.codigoBarras));
                               setDialogoEditar(true);
                             }}
                             icone={<Pencil size={16} color={cores.texto} />}
@@ -511,6 +587,35 @@ export default function TelaProdutos() {
         }
       >
         {camposFormulario("edit-")}
+      </Dialogo>
+
+      <Dialogo
+        aberto={dialogoEditarCategoria}
+        onFechar={() => setDialogoEditarCategoria(false)}
+        titulo="Editar Categoria"
+        descricao="Renomeia a categoria em todos os produtos vinculados."
+        testID="dialog-edit-category"
+        rodape={
+          <>
+            <Botao variante="contorno" titulo="Cancelar" onPress={() => setDialogoEditarCategoria(false)} />
+            <Botao
+              testID="button-save-category"
+              titulo="Salvar Categoria"
+              carregando={atualizarCategoria.isPending}
+              onPress={salvarCategoria}
+            />
+          </>
+        }
+      >
+        <View style={{ gap: espaco.sm }}>
+          <Rotulo>Nome da categoria</Rotulo>
+          <Campo
+            testID="input-category-name"
+            valor={nomeCategoria}
+            onChange={setNomeCategoria}
+            placeholder="Ex: Cabos"
+          />
+        </View>
       </Dialogo>
 
       <Dialogo

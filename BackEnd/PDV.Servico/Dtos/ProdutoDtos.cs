@@ -12,6 +12,17 @@ public record ProdutoDto(
     string? Imagem,
     bool EstoqueBaixo);
 
+public record CategoriaProdutoDto(
+    string Nome,
+    int Quantidade,
+    int EstoqueTotal,
+    decimal ValorTotal);
+
+public class CategoriaAtualizacaoDto
+{
+    public string Nome { get; set; } = string.Empty;
+}
+
 public class ProdutoEntradaDto
 {
     public string Sku { get; set; } = string.Empty;

@@ -3,6 +3,7 @@ using PDV.Repositorio;
 using PDV.Servico.Interfaces;
 using PDV.Servico.Servicos;
 using PDV.WebApi.Autenticacao;
+using PDV.WebApi.Backup;
 
 namespace PDV.WebApi.Configuracao;
 
@@ -11,6 +12,7 @@ public static class InjecaoDependencia
     public static IServiceCollection AdicionarRepositorios(this IServiceCollection servicos)
     {
         servicos.AddScoped<IRepositorioProduto, RepositorioProduto>();
+        servicos.AddScoped<IRepositorioServico, RepositorioServico>();
         servicos.AddScoped<IRepositorioVenda, RepositorioVenda>();
         servicos.AddScoped<IRepositorioVendedor, RepositorioVendedor>();
         servicos.AddScoped<IRepositorioOrdemServico, RepositorioOrdemServico>();
@@ -25,6 +27,7 @@ public static class InjecaoDependencia
     public static IServiceCollection AdicionarServicosDeDominio(this IServiceCollection servicos)
     {
         servicos.AddScoped<IServicoProduto, ServicoProduto>();
+        servicos.AddScoped<IServicoServico, ServicoServico>();
         servicos.AddScoped<IServicoVenda, ServicoVenda>();
         servicos.AddScoped<IServicoVendedor, ServicoVendedor>();
         servicos.AddScoped<IServicoOrdemServico, ServicoOrdemServico>();
@@ -33,6 +36,7 @@ public static class InjecaoDependencia
         servicos.AddScoped<IServicoUsuario, ServicoUsuario>();
         servicos.AddScoped<IServicoConfiguracaoLoja, ServicoConfiguracaoLoja>();
         servicos.AddScoped<IServicoCaixa, ServicoCaixa>();
+        servicos.AddScoped<ServicoBackup>();
         servicos.AddSingleton<GeradorTokenJwt>();
 
         return servicos;

@@ -15,6 +15,8 @@ export const clienteConsultas = new QueryClient({
 
 export const chaves = {
   produtos: ["/api/produtos"],
+  categoriasProdutos: ["/api/produtos/categorias"],
+  servicos: ["/api/servicos"],
   vendas: ["/api/vendas"],
   vendasHoje: ["/api/vendas/hoje"],
   vendedores: ["/api/vendedores"],

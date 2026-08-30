@@ -19,10 +19,29 @@ public static class Mapeador
 
     public static ItemVendaDto ParaDto(this ItemVenda item) => new(
         item.ProdutoId,
+        item.ServicoId,
+        item.Tipo,
         item.Nome,
         item.Quantidade,
         item.PrecoUnitario,
         item.Desconto,
+        item.Total);
+
+    public static ServicoDto ParaDto(this Servico servico) => new(
+        servico.Id,
+        servico.Nome,
+        servico.Descricao,
+        servico.PrecoPadrao,
+        servico.Ativo,
+        servico.CriadoEm);
+
+    public static ItemOrdemServicoDto ParaDto(this ItemOrdemServico item) => new(
+        item.ProdutoId,
+        item.ServicoId,
+        item.Tipo,
+        item.Nome,
+        item.Quantidade,
+        item.PrecoUnitario,
         item.Total);
 
     public static VendaDto ParaDto(this Venda venda) => new(
@@ -69,6 +88,7 @@ public static class Mapeador
         ordem.Status,
         ordem.Prioridade,
         ordem.Valor,
+        ordem.Itens.Select(item => item.ParaDto()).ToList(),
         ordem.Data,
         ordem.Prazo,
         ordem.DataSaida,

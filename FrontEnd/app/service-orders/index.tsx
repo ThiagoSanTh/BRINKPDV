@@ -44,6 +44,14 @@ function estaEncerrada(status: string) {
   return status === "Entregue" || status === "Cancelada" || status === "Concluída";
 }
 
+function normalizarStatus(status: string) {
+  return status.trim().toLowerCase();
+}
+
+function estaEmAndamento(status: string) {
+  return normalizarStatus(status) === "em andamento";
+}
+
 function payloadOrdem(ordem: OrdemServico, extras: Record<string, unknown> = {}) {
   return {
     clienteId: ordem.clienteId,
@@ -58,6 +66,7 @@ function payloadOrdem(ordem: OrdemServico, extras: Record<string, unknown> = {})
     status: ordem.status,
     prioridade: ordem.prioridade,
     valor: ordem.valor,
+    itens: ordem.itens,
     prazo: ordem.prazo,
     dataSaida: ordem.dataSaida,
     ...extras,
@@ -104,7 +113,7 @@ export default function TelaOrdensServico() {
           (ordem.tipoAparelho ?? "").toLowerCase().includes(termo) ||
           ordem.problema.toLowerCase().includes(termo);
 
-        return casaBusca && (filtroStatus ? ordem.status === filtroStatus : true);
+        return casaBusca && (filtroStatus ? normalizarStatus(ordem.status) === normalizarStatus(filtroStatus) : true);
       }),
     [ordens, busca, filtroStatus],
   );
@@ -188,7 +197,7 @@ export default function TelaOrdensServico() {
           >
             <CartaoResumo
               titulo={`Em Andamento ${filtroStatus === "Em Andamento" ? "✓" : ""}`}
-              valor={String(ordens.filter((ordem) => ordem.status === "Em Andamento").length)}
+              valor={String(ordens.filter((ordem) => estaEmAndamento(ordem.status)).length)}
               cor={cores.primaria}
             />
           </Pressable>,

@@ -11,15 +11,18 @@ public class ServicoVenda : IServicoVenda
 {
     private readonly IRepositorioVenda _repositorioVenda;
     private readonly IRepositorioProduto _repositorioProduto;
+    private readonly IRepositorioServico _repositorioServico;
     private readonly IRepositorioVendedor _repositorioVendedor;
 
     public ServicoVenda(
         IRepositorioVenda repositorioVenda,
         IRepositorioProduto repositorioProduto,
+        IRepositorioServico repositorioServico,
         IRepositorioVendedor repositorioVendedor)
     {
         _repositorioVenda = repositorioVenda;
         _repositorioProduto = repositorioProduto;
+        _repositorioServico = repositorioServico;
         _repositorioVendedor = repositorioVendedor;
     }
 
@@ -67,9 +70,61 @@ public class ServicoVenda : IServicoVenda
 
         foreach (var itemEntrada in entrada.Itens)
         {
+            var tipo = string.IsNullOrWhiteSpace(itemEntrada.Tipo)
+                ? TiposItemTransacional.Produto
+                : itemEntrada.Tipo.Trim().ToLower();
+
+            if (!TiposItemTransacional.EhValido(tipo))
+            {
+                throw new RegraNegocioException($"Tipo de item inválido: {itemEntrada.Tipo}.");
+            }
+
             if (itemEntrada.Quantidade <= 0)
             {
                 throw new RegraNegocioException("A quantidade de cada item deve ser maior que zero.");
+            }
+
+            if (tipo == TiposItemTransacional.Servico)
+            {
+                if (string.IsNullOrWhiteSpace(itemEntrada.ServicoId))
+                {
+                    throw new RegraNegocioException("Informe o serviço do item.");
+                }
+
+                var servico = await _repositorioServico.ObterPorIdAsync(itemEntrada.ServicoId, cancelamento)
+                    ?? throw new RecursoNaoEncontradoException($"Serviço {itemEntrada.ServicoId} não encontrado.");
+
+                var precoUnitario = itemEntrada.PrecoUnitario ?? servico.PrecoPadrao;
+
+                if (precoUnitario is null or <= 0)
+                {
+                    throw new RegraNegocioException($"Informe o valor cobrado para {servico.Nome}.");
+                }
+
+                var desconto = Math.Max(0, itemEntrada.Desconto);
+
+                if (desconto > precoUnitario.Value * itemEntrada.Quantidade)
+                {
+                    throw new RegraNegocioException($"O desconto de {servico.Nome} é maior que o valor do item.");
+                }
+
+                itens.Add(new ItemVenda
+                {
+                    ProdutoId = string.Empty,
+                    ServicoId = servico.Id,
+                    Tipo = TiposItemTransacional.Servico,
+                    Nome = servico.Nome,
+                    Quantidade = itemEntrada.Quantidade,
+                    PrecoUnitario = precoUnitario.Value,
+                    Desconto = desconto,
+                });
+
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(itemEntrada.ProdutoId))
+            {
+                throw new RegraNegocioException("Informe o produto do item.");
             }
 
             var produto = await _repositorioProduto.ObterPorIdAsync(itemEntrada.ProdutoId, cancelamento)
@@ -98,6 +153,7 @@ public class ServicoVenda : IServicoVenda
             itens.Add(new ItemVenda
             {
                 ProdutoId = produto.Id,
+                Tipo = TiposItemTransacional.Produto,
                 Nome = produto.Nome,
                 Quantidade = itemEntrada.Quantidade,
                 PrecoUnitario = precoUnitario,

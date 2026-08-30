@@ -11,8 +11,26 @@ export type Produto = {
   estoqueBaixo: boolean;
 };
 
+export type CategoriaProduto = {
+  nome: string;
+  quantidade: number;
+  estoqueTotal: number;
+  valorTotal: number;
+};
+
+export type Servico = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  precoPadrao: number | null;
+  ativo: boolean;
+  criadoEm: string;
+};
+
 export type ItemVenda = {
   produtoId: string;
+  servicoId: string | null;
+  tipo: "produto" | "servico";
   nome: string;
   quantidade: number;
   precoUnitario: number;
@@ -74,10 +92,21 @@ export type OrdemServico = {
   status: string;
   prioridade: string;
   valor: number;
+  itens: ItemOrdemServico[];
   data: string;
   prazo: string;
   dataSaida: string | null;
   whatsApp?: ResultadoWhatsApp | null;
+};
+
+export type ItemOrdemServico = {
+  produtoId: string | null;
+  servicoId: string | null;
+  tipo: "produto" | "servico";
+  nome: string;
+  quantidade: number;
+  precoUnitario: number;
+  total: number;
 };
 
 export type Usuario = {
@@ -129,6 +158,27 @@ export type ResumoCaixa = {
   saidas: number;
   saldo: number;
   movimentos: MovimentoCaixa[];
+};
+
+export type ManifestBackup = {
+  format: string;
+  version: number;
+  createdAt: string;
+  applicationVersion: string;
+  storeId: string | null;
+  storeName: string;
+  records: Record<string, number>;
+};
+
+export type ResumoBackup = {
+  manifest: ManifestBackup;
+  fileName: string;
+};
+
+export type ResultadoRestore = {
+  manifest: ManifestBackup;
+  preventiveBackupFileName: string | null;
+  mensagem: string;
 };
 
 export const formasPagamento = ["Dinheiro", "Crédito", "Débito", "PIX"] as const;

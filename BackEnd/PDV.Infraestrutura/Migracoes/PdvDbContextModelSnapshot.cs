@@ -238,6 +238,13 @@ namespace PDV.Infraestrutura.Migracoes
                         .HasDefaultValue("Bom")
                         .HasColumnName("device_condition");
 
+                    b.Property<string>("Itens")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("[]")
+                        .HasColumnName("items");
+
                     b.Property<string>("Marca")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -350,6 +357,45 @@ namespace PDV.Infraestrutura.Migracoes
                         .IsUnique();
 
                     b.ToTable("products", (string)null);
+                });
+
+            modelBuilder.Entity("PDV.Dominio.Entidades.Servico", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("varchar")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("active");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Descricao")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<decimal?>("PrecoPadrao")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("default_price");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Ativo");
+
+                    b.HasIndex("Nome")
+                        .IsUnique();
+
+                    b.ToTable("services", (string)null);
                 });
 
             modelBuilder.Entity("PDV.Dominio.Entidades.Usuario", b =>

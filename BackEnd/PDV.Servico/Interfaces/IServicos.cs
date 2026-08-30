@@ -7,11 +7,33 @@ public interface IServicoProduto
 {
     Task<IReadOnlyList<ProdutoDto>> ListarAsync(CancellationToken cancelamento = default);
 
+    Task<IReadOnlyList<CategoriaProdutoDto>> ListarCategoriasAsync(CancellationToken cancelamento = default);
+
+    Task<IReadOnlyList<ProdutoDto>> ListarPorCategoriaAsync(string categoria, CancellationToken cancelamento = default);
+
     Task<ProdutoDto?> ObterAsync(string id, CancellationToken cancelamento = default);
 
     Task<ProdutoDto> CriarAsync(ProdutoEntradaDto entrada, CancellationToken cancelamento = default);
 
     Task<ProdutoDto?> AtualizarAsync(string id, ProdutoEntradaDto entrada, CancellationToken cancelamento = default);
+
+    Task<CategoriaProdutoDto> AtualizarCategoriaAsync(
+        string categoriaAtual,
+        CategoriaAtualizacaoDto entrada,
+        CancellationToken cancelamento = default);
+
+    Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default);
+}
+
+public interface IServicoServico
+{
+    Task<IReadOnlyList<ServicoDto>> ListarAsync(CancellationToken cancelamento = default);
+
+    Task<ServicoDto?> ObterAsync(string id, CancellationToken cancelamento = default);
+
+    Task<ServicoDto> CriarAsync(ServicoEntradaDto entrada, CancellationToken cancelamento = default);
+
+    Task<ServicoDto?> AtualizarAsync(string id, ServicoEntradaDto entrada, CancellationToken cancelamento = default);
 
     Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default);
 }

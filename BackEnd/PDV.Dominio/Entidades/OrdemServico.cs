@@ -16,6 +16,7 @@ public class OrdemServico
     public string Status { get; set; } = StatusOrdemServico.Orcamento;
     public string Prioridade { get; set; } = PrioridadesOrdemServico.Media;
     public decimal Valor { get; set; }
+    public List<ItemOrdemServico> Itens { get; set; } = [];
     public DateOnly Data { get; set; } = DateOnly.FromDateTime(DateTime.Today);
     public DateOnly Prazo { get; set; } = DateOnly.FromDateTime(DateTime.Today.AddDays(7));
     public DateOnly? DataSaida { get; set; }
@@ -49,7 +50,7 @@ public static class StatusOrdemServico
         Cancelada,
     ];
 
-    public static bool EhValido(string status) => Todos.Contains(status) || status == "Concluída";
+    public static bool EhValido(string status) => Todos.Contains(Normalizar(status)) || status == "Concluída";
 
     public static string Normalizar(string? status)
     {
@@ -58,7 +59,15 @@ public static class StatusOrdemServico
             return Orcamento;
         }
 
-        return status == "Concluída" ? Entregue : status;
+        var limpo = status.Trim();
+
+        if (limpo == "Concluída")
+        {
+            return Entregue;
+        }
+
+        var encontrado = Todos.FirstOrDefault(item => string.Equals(item, limpo, StringComparison.OrdinalIgnoreCase));
+        return encontrado ?? limpo;
     }
 
     public static bool EstaEncerrada(string status) =>

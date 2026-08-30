@@ -22,6 +22,17 @@ public class RepositorioProduto : IRepositorioProduto
             .ToListAsync(cancelamento);
     }
 
+    public async Task<IReadOnlyList<Produto>> ObterPorCategoriaAsync(string categoria, CancellationToken cancelamento = default)
+    {
+        var normalizada = categoria.Trim().ToLower();
+
+        return await _contexto.Produtos
+            .AsNoTracking()
+            .Where(produto => produto.Categoria.ToLower() == normalizada)
+            .OrderBy(produto => produto.Nome)
+            .ToListAsync(cancelamento);
+    }
+
     public async Task<Produto?> ObterPorIdAsync(string id, CancellationToken cancelamento = default)
     {
         return await _contexto.Produtos.FirstOrDefaultAsync(produto => produto.Id == id, cancelamento);
@@ -59,6 +70,25 @@ public class RepositorioProduto : IRepositorioProduto
 
         await _contexto.SaveChangesAsync(cancelamento);
         return existente;
+    }
+
+    public async Task<int> RenomearCategoriaAsync(
+        string categoriaAtual,
+        string novaCategoria,
+        CancellationToken cancelamento = default)
+    {
+        var atualNormalizada = categoriaAtual.Trim().ToLower();
+        var produtos = await _contexto.Produtos
+            .Where(produto => produto.Categoria.ToLower() == atualNormalizada)
+            .ToListAsync(cancelamento);
+
+        foreach (var produto in produtos)
+        {
+            produto.Categoria = novaCategoria;
+        }
+
+        await _contexto.SaveChangesAsync(cancelamento);
+        return produtos.Count;
     }
 
     public async Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default)

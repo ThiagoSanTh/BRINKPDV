@@ -13,10 +13,12 @@ import { Seletor } from "../../componentes/ui/Seletor";
 import { TituloPagina } from "../../componentes/ui/TituloPagina";
 import { api } from "../../lib/api";
 import { chaves } from "../../lib/consultas";
-import { paraNumero } from "../../lib/formato";
+import { moeda, paraNumero } from "../../lib/formato";
 import {
   Cliente,
+  ItemOrdemServico,
   OrdemServico,
+  Servico,
   estadosAparelho,
   marcasAparelho,
   prioridadesOrdemServico,
@@ -39,6 +41,7 @@ export default function TelaNovaOrdemServico() {
   const editando = Boolean(idEdicao);
 
   const { data: clientes = [] } = useQuery<Cliente[]>({ queryKey: chaves.clientes });
+  const { data: servicos = [] } = useQuery<Servico[]>({ queryKey: chaves.servicos });
   const { data: ordemAtual } = useQuery<OrdemServico>({
     queryKey: ["/api/ordens-servico/", idEdicao],
     enabled: editando,
@@ -58,6 +61,9 @@ export default function TelaNovaOrdemServico() {
   const [status, setStatus] = useState<string>("Orçamento");
   const [prazo, setPrazo] = useState("");
   const [valor, setValor] = useState("");
+  const [itens, setItens] = useState<ItemOrdemServico[]>([]);
+  const [servicoId, setServicoId] = useState<string | null>(null);
+  const [valorServico, setValorServico] = useState("");
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
   useEffect(() => {
@@ -97,12 +103,15 @@ export default function TelaNovaOrdemServico() {
     setStatus(ordemAtual.status);
     setPrazo(ordemAtual.prazo?.slice(0, 10) ?? "");
     setValor(String(ordemAtual.valor ?? 0).replace(".", ","));
+    setItens(ordemAtual.itens ?? []);
   }, [ordemAtual]);
 
   const opcoesClientes = useMemo(
     () => clientes.map((cliente) => ({ valor: cliente.id, rotulo: `${cliente.nome} — ${cliente.telefone}` })),
     [clientes],
   );
+  const servicosAtivos = useMemo(() => servicos.filter((servico) => servico.ativo), [servicos]);
+  const totalItens = itens.reduce((soma, item) => soma + item.precoUnitario * item.quantidade, 0);
 
   const criar = useMutation({
     mutationFn: (dados: unknown) => api.criar<OrdemServico>("/api/ordens-servico", dados),
@@ -152,9 +161,51 @@ export default function TelaNovaOrdemServico() {
       problema: problema.trim(),
       prioridade,
       status,
-      valor: paraNumero(valor),
+      valor: itens.length > 0 ? totalItens : paraNumero(valor),
+      itens: itens.map((item) => ({
+        produtoId: item.produtoId,
+        servicoId: item.servicoId,
+        tipo: item.tipo,
+        nome: item.nome,
+        quantidade: item.quantidade,
+        precoUnitario: item.precoUnitario,
+      })),
       prazo: prazo || null,
     };
+  }
+
+  function adicionarServico() {
+    const servico = servicos.find((item) => item.id === servicoId);
+
+    if (!servico) {
+      avisar({ titulo: "Serviço obrigatório", descricao: "Selecione um serviço.", variante: "perigo" });
+      return;
+    }
+
+    const preco = valorServico ? paraNumero(valorServico) : (servico.precoPadrao ?? 0);
+
+    if (preco <= 0) {
+      avisar({
+        titulo: "Valor obrigatório",
+        descricao: "Informe o valor cobrado pelo serviço.",
+        variante: "perigo",
+      });
+      return;
+    }
+
+    const novoItem: ItemOrdemServico = {
+      produtoId: null,
+      servicoId: servico.id,
+      tipo: "servico",
+      nome: servico.nome,
+      quantidade: 1,
+      precoUnitario: preco,
+      total: preco,
+    };
+
+    setItens((atuais) => [...atuais, novoItem]);
+    setServicoId(null);
+    setValorServico("");
   }
 
   async function salvar() {
@@ -453,15 +504,91 @@ export default function TelaNovaOrdemServico() {
               <Campo testID="input-deadline" valor={prazo} onChange={setPrazo} placeholder="AAAA-MM-DD" />
             </View>
             <View style={{ flex: 1, gap: espaco.sm }}>
-              <Rotulo>Valor estimado</Rotulo>
+              <Rotulo>{itens.length > 0 ? "Valor total dos itens" : "Valor estimado"}</Rotulo>
               <Campo
                 testID="input-value"
-                valor={valor}
+                valor={itens.length > 0 ? String(totalItens).replace(".", ",") : valor}
                 onChange={setValor}
                 placeholder="0,00"
                 teclado="decimal-pad"
+                editavel={itens.length === 0}
               />
             </View>
+          </View>
+
+          <View style={{ gap: espaco.md }}>
+            <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "600" }}>
+              Serviços cobrados
+            </Text>
+
+            {servicosAtivos.length > 0 ? (
+              <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>
+                <View style={{ flex: 2, gap: espaco.sm }}>
+                  <Rotulo>Serviço</Rotulo>
+                  <Seletor
+                    testID="select-service"
+                    valor={servicoId}
+                    onChange={(id) => {
+                      setServicoId(id);
+                      const servico = servicos.find((item) => item.id === id);
+                      setValorServico(servico?.precoPadrao != null ? String(servico.precoPadrao).replace(".", ",") : "");
+                    }}
+                    opcoes={servicosAtivos.map((servico) => ({
+                      valor: servico.id,
+                      rotulo: servico.precoPadrao != null
+                        ? `${servico.nome} — ${moeda(servico.precoPadrao)}`
+                        : `${servico.nome} — definir valor`,
+                    }))}
+                    placeholder="Selecione o serviço"
+                  />
+                </View>
+                <View style={{ flex: 1, gap: espaco.sm }}>
+                  <Rotulo>Valor cobrado</Rotulo>
+                  <Campo
+                    testID="input-service-price"
+                    valor={valorServico}
+                    onChange={setValorServico}
+                    placeholder="0,00"
+                    teclado="decimal-pad"
+                  />
+                </View>
+                <View style={{ justifyContent: "flex-end" }}>
+                  <Botao testID="button-add-service-item" titulo="Adicionar" onPress={adicionarServico} />
+                </View>
+              </View>
+            ) : (
+              <Text style={{ color: cores.suaveTexto }}>
+                Cadastre serviços em Configurações para adicioná-los à OS.
+              </Text>
+            )}
+
+            {itens.length > 0 ? (
+              <View style={{ gap: espaco.sm }}>
+                {itens.map((item, indice) => (
+                  <View
+                    key={`${item.tipo}-${item.servicoId ?? item.produtoId}-${indice}`}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: espaco.md,
+                    }}
+                  >
+                    <Text style={{ color: cores.texto, fontSize: fonte.base, flex: 1 }}>{item.nome}</Text>
+                    <Text style={{ color: cores.primaria, fontSize: fonte.base, fontWeight: "600" }}>
+                      {moeda(item.precoUnitario * item.quantidade)}
+                    </Text>
+                    <Botao
+                      testID={`button-remove-service-item-${indice}`}
+                      variante="fantasma"
+                      tamanho="pequeno"
+                      titulo="Remover"
+                      onPress={() => setItens((atuais) => atuais.filter((_, atual) => atual !== indice))}
+                    />
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
 
           <View style={{ flexDirection: ehDesktop ? "row" : "column", gap: espaco.md }}>

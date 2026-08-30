@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Barcode, CreditCard, Grid3x3, List, Package, Plus, Search } from "lucide-react-native";
+import { Barcode, CreditCard, Grid3x3, List, Package, Plus, Search, Wrench } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -20,12 +20,14 @@ import { chaves } from "../lib/consultas";
 import { moeda, paraNumero } from "../lib/formato";
 import { colunas, larguraColuna, useLarguraConteudo } from "../lib/layout";
 import { tocarSomFinalizacao } from "../lib/som";
-import { ConfiguracaoLoja, formasPagamento, Produto, Venda, Vendedor } from "../lib/tipos";
+import { ConfiguracaoLoja, formasPagamento, Produto, Servico, Venda, Vendedor } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte } from "../tema/tokens";
 
 type ItemCarrinhoLocal = {
   id: string;
+  referenciaId: string;
+  tipo: "produto" | "servico";
   nome: string;
   preco: number;
   quantidade: number;
@@ -54,6 +56,7 @@ export default function TelaPdv() {
     queryKey: chaves.produtos,
   });
   const { data: vendedores = [] } = useQuery<Vendedor[]>({ queryKey: chaves.vendedores });
+  const { data: servicos = [] } = useQuery<Servico[]>({ queryKey: chaves.servicos });
   const { data: configuracao } = useQuery<ConfiguracaoLoja>({ queryKey: chaves.configuracaoLoja });
 
   useEffect(() => {
@@ -102,6 +105,19 @@ export default function TelaPdv() {
     [produtos, busca, codigoNormalizado, categoria],
   );
 
+  const servicosFiltrados = useMemo(
+    () =>
+      servicos.filter((servico) => {
+        const termo = busca.toLowerCase();
+        return (
+          servico.ativo &&
+          (servico.nome.toLowerCase().includes(termo) ||
+            (servico.descricao ?? "").toLowerCase().includes(termo))
+        );
+      }),
+    [servicos, busca],
+  );
+
   function adicionar(produtoId: string) {
     const produto = produtos.find((item) => item.id === produtoId);
 
@@ -109,18 +125,59 @@ export default function TelaPdv() {
       return;
     }
 
+    const id = `produto:${produto.id}`;
     setCarrinho((atual) => {
-      const existente = atual.find((item) => item.id === produtoId);
+      const existente = atual.find((item) => item.id === id);
 
       if (existente) {
         return atual.map((item) =>
-          item.id === produtoId ? { ...item, quantidade: item.quantidade + 1 } : item,
+          item.id === id ? { ...item, quantidade: item.quantidade + 1 } : item,
         );
       }
 
       return [
         ...atual,
-        { id: produto.id, nome: produto.nome, preco: produto.preco, quantidade: 1, desconto: 0 },
+        {
+          id,
+          referenciaId: produto.id,
+          tipo: "produto",
+          nome: produto.nome,
+          preco: produto.preco,
+          quantidade: 1,
+          desconto: 0,
+        },
+      ];
+    });
+  }
+
+  function adicionarServico(servicoId: string) {
+    const servico = servicos.find((item) => item.id === servicoId);
+
+    if (!servico) {
+      return;
+    }
+
+    const id = `servico:${servico.id}`;
+    setCarrinho((atual) => {
+      const existente = atual.find((item) => item.id === id);
+
+      if (existente) {
+        return atual.map((item) =>
+          item.id === id ? { ...item, quantidade: item.quantidade + 1 } : item,
+        );
+      }
+
+      return [
+        ...atual,
+        {
+          id,
+          referenciaId: servico.id,
+          tipo: "servico",
+          nome: servico.nome,
+          preco: servico.precoPadrao ?? 0,
+          quantidade: 1,
+          desconto: 0,
+        },
       ];
     });
   }
@@ -140,6 +197,7 @@ export default function TelaPdv() {
   const descontoTotal = carrinho.reduce((soma, item) => soma + item.desconto, 0);
   const total = Math.max(0, subtotal - descontoTotal);
   const troco = valorRecebido ? paraNumero(valorRecebido) - total : 0;
+  const temItemSemPreco = carrinho.some((item) => item.preco <= 0);
 
   async function finalizar() {
     if (carrinho.length === 0) {
@@ -152,7 +210,9 @@ export default function TelaPdv() {
         formaPagamento,
         observacao,
         itens: carrinho.map((item) => ({
-          produtoId: item.id,
+          produtoId: item.tipo === "produto" ? item.referenciaId : null,
+          servicoId: item.tipo === "servico" ? item.referenciaId : null,
+          tipo: item.tipo,
           quantidade: item.quantidade,
           precoUnitario: item.preco,
           desconto: item.desconto,
@@ -320,7 +380,7 @@ export default function TelaPdv() {
               Nenhum produto encontrado
             </Text>
             <Text style={{ color: cores.suaveTexto, fontSize: fonte.base }}>
-              Cadastre produtos na seção &quot;Produtos&quot; para começar a vender
+              Cadastre produtos ou serviços para começar a vender
             </Text>
           </View>
         ) : modo === "grade" ? (
@@ -397,6 +457,52 @@ export default function TelaPdv() {
             </View>
           </Cartao>
         )}
+
+        {servicosFiltrados.length > 0 ? (
+          <Cartao testID="card-pos-services">
+            <View style={{ padding: espaco.lg, gap: espaco.md }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: espaco.sm }}>
+                <Wrench size={18} color={cores.primaria} />
+                <Text style={{ color: cores.texto, fontSize: fonte.lg, fontWeight: "600" }}>
+                  Serviços
+                </Text>
+              </View>
+              <Tabela larguraMinima={ehDesktop ? undefined : 520}>
+                <LinhaTabela cabecalho>
+                  <CelulaTabela cabecalho proporcao={3}>
+                    Serviço
+                  </CelulaTabela>
+                  <CelulaTabela cabecalho proporcao={1.5} alinhamento="flex-end">
+                    Preço sugerido
+                  </CelulaTabela>
+                  <CelulaTabela cabecalho proporcao={1} alinhamento="flex-end">
+                    Ação
+                  </CelulaTabela>
+                </LinhaTabela>
+
+                {servicosFiltrados.map((servico) => (
+                  <LinhaTabela key={servico.id} testID={`service-row-${servico.id}`}>
+                    <CelulaTabela proporcao={3} estiloTexto={{ fontWeight: "500" }}>
+                      {servico.nome}
+                    </CelulaTabela>
+                    <CelulaTabela proporcao={1.5} alinhamento="flex-end">
+                      {servico.precoPadrao != null ? moeda(servico.precoPadrao) : "Definir no carrinho"}
+                    </CelulaTabela>
+                    <CelulaTabela proporcao={1} alinhamento="flex-end">
+                      <Botao
+                        testID={`button-add-service-${servico.id}`}
+                        variante="fantasma"
+                        tamanho="icone"
+                        onPress={() => adicionarServico(servico.id)}
+                        icone={<Plus size={16} color={cores.texto} />}
+                      />
+                    </CelulaTabela>
+                  </LinhaTabela>
+                ))}
+              </Tabela>
+            </View>
+          </Cartao>
+        ) : null}
       </View>
 
       <Cartao testID="card-shopping-cart" estilo={{ width: ehDesktop ? 384 : "100%" }}>
@@ -488,9 +594,15 @@ export default function TelaPdv() {
               titulo="Finalizar Venda"
               tamanho="grande"
               larguraTotal
+              desabilitado={temItemSemPreco}
               icone={<CreditCard size={18} color={cores.primariaTexto} />}
               onPress={() => setDialogoDetalhes(true)}
             />
+            {temItemSemPreco ? (
+              <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+                Informe o valor dos serviços sem preço padrão antes de finalizar.
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </Cartao>

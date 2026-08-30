@@ -66,9 +66,15 @@ public static class InicializadorBanco
 
         foreach (var ordem in ordens)
         {
-            if (ordem.Status == "Concluída")
+            var statusNormalizado = StatusOrdemServico.Normalizar(ordem.Status);
+
+            if (ordem.Status != statusNormalizado)
             {
-                ordem.Status = StatusOrdemServico.Entregue;
+                ordem.Status = statusNormalizado;
+            }
+
+            if (ordem.Status == StatusOrdemServico.Entregue)
+            {
                 ordem.DataSaida ??= ordem.Data;
             }
 

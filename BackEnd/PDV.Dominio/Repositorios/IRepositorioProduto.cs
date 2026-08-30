@@ -6,6 +6,8 @@ public interface IRepositorioProduto
 {
     Task<IReadOnlyList<Produto>> ObterTodosAsync(CancellationToken cancelamento = default);
 
+    Task<IReadOnlyList<Produto>> ObterPorCategoriaAsync(string categoria, CancellationToken cancelamento = default);
+
     Task<Produto?> ObterPorIdAsync(string id, CancellationToken cancelamento = default);
 
     Task<Produto?> ObterPorSkuAsync(string sku, CancellationToken cancelamento = default);
@@ -13,6 +15,8 @@ public interface IRepositorioProduto
     Task<Produto> CriarAsync(Produto produto, CancellationToken cancelamento = default);
 
     Task<Produto?> AtualizarAsync(Produto produto, CancellationToken cancelamento = default);
+
+    Task<int> RenomearCategoriaAsync(string categoriaAtual, string novaCategoria, CancellationToken cancelamento = default);
 
     Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default);
 }

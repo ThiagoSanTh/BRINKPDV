@@ -24,6 +24,30 @@ public class ProdutosController : ControllerBase
         return Ok(await _servico.ListarAsync(cancelamento));
     }
 
+    [HttpGet("categorias")]
+    public async Task<ActionResult<IReadOnlyList<CategoriaProdutoDto>>> ListarCategorias(CancellationToken cancelamento)
+    {
+        return Ok(await _servico.ListarCategoriasAsync(cancelamento));
+    }
+
+    [HttpGet("categorias/{categoria}/produtos")]
+    public async Task<ActionResult<IReadOnlyList<ProdutoDto>>> ListarPorCategoria(
+        string categoria,
+        CancellationToken cancelamento)
+    {
+        return Ok(await _servico.ListarPorCategoriaAsync(Uri.UnescapeDataString(categoria), cancelamento));
+    }
+
+    [HttpPut("categorias/{categoria}")]
+    [Authorize(Roles = FuncoesUsuario.PapeisGestao)]
+    public async Task<ActionResult<CategoriaProdutoDto>> AtualizarCategoria(
+        string categoria,
+        CategoriaAtualizacaoDto entrada,
+        CancellationToken cancelamento)
+    {
+        return Ok(await _servico.AtualizarCategoriaAsync(Uri.UnescapeDataString(categoria), entrada, cancelamento));
+    }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<ProdutoDto>> Obter(string id, CancellationToken cancelamento)
     {

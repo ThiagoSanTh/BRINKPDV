@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
   Image as ImagemIcone,
+  Pencil,
   Plus,
   MessageCircle,
   Printer,
@@ -17,6 +18,7 @@ import {
   Trash2,
   User,
   Users,
+  Wrench,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Image, Linking, Pressable, Text, View } from "react-native";
@@ -34,12 +36,13 @@ import { Seletor } from "../componentes/ui/Seletor";
 import { CelulaTabela, LinhaTabela, Tabela } from "../componentes/ui/Tabela";
 import { TituloPagina } from "../componentes/ui/TituloPagina";
 import { api } from "../lib/api";
-import { baixarTexto, escolherImagemBase64 } from "../lib/arquivos";
+import { baixarBlob, escolherBackupBrink, escolherImagemBase64 } from "../lib/arquivos";
 import { useAutenticacao } from "../lib/autenticacao";
 import { chaves } from "../lib/consultas";
+import { dataCurta, moeda, paraNumero } from "../lib/formato";
 import { colunas, useLarguraConteudo } from "../lib/layout";
 import { ehGestao, funcoesQuePodeCriar, podeCriarFuncao } from "../lib/permissoes";
-import { Cliente, ConfiguracaoLoja, Usuario } from "../lib/tipos";
+import { ConfiguracaoLoja, ResultadoRestore, ResumoBackup, Servico, Usuario } from "../lib/tipos";
 import { useTema } from "../tema/TemaProvider";
 import { espaco, fonte, raio } from "../tema/tokens";
 import Constants from "expo-constants";
@@ -105,6 +108,10 @@ export default function TelaConfiguracoes() {
     queryKey: chaves.usuarios,
     enabled: gestao,
   });
+  const { data: servicos = [] } = useQuery<Servico[]>({
+    queryKey: chaves.servicos,
+    enabled: gestao,
+  });
 
   const [logo, setLogo] = useState<string | null>(null);
   const [dadosLoja, setDadosLoja] = useState({
@@ -144,6 +151,18 @@ export default function TelaConfiguracoes() {
     senha: "",
     funcao: "Vendedor",
   });
+  const [dialogoServico, setDialogoServico] = useState(false);
+  const [servicoSelecionado, setServicoSelecionado] = useState<Servico | null>(null);
+  const [formularioServico, setFormularioServico] = useState({
+    nome: "",
+    descricao: "",
+    precoPadrao: "",
+    ativo: true,
+  });
+  const [backupResumo, setBackupResumo] = useState<ResumoBackup | null>(null);
+  const [arquivoBackup, setArquivoBackup] = useState<File | null>(null);
+  const [restoreResumo, setRestoreResumo] = useState<ResumoBackup | null>(null);
+  const [resultadoRestore, setResultadoRestore] = useState<ResultadoRestore | null>(null);
 
   useEffect(() => {
     if (!configuracao) {
@@ -226,6 +245,34 @@ export default function TelaConfiguracoes() {
   const removerUsuario = useMutation({
     mutationFn: (id: string) => api.remover(`/api/usuarios/${id}`),
     onSuccess: () => clienteConsultas.invalidateQueries({ queryKey: chaves.usuarios }),
+  });
+
+  const criarServico = useMutation({
+    mutationFn: (dados: unknown) => api.criar<Servico>("/api/servicos", dados),
+    onSuccess: () => clienteConsultas.invalidateQueries({ queryKey: chaves.servicos }),
+  });
+
+  const atualizarServico = useMutation({
+    mutationFn: ({ id, dados }: { id: string; dados: unknown }) =>
+      api.atualizar<Servico>(`/api/servicos/${id}`, dados),
+    onSuccess: () => clienteConsultas.invalidateQueries({ queryKey: chaves.servicos }),
+  });
+
+  const removerServico = useMutation({
+    mutationFn: (id: string) => api.remover(`/api/servicos/${id}`),
+    onSuccess: () => clienteConsultas.invalidateQueries({ queryKey: chaves.servicos }),
+  });
+
+  const criarBackup = useMutation({
+    mutationFn: () => api.baixarArquivo("/api/backup"),
+  });
+
+  const validarBackup = useMutation({
+    mutationFn: (arquivo: File) => api.enviarArquivo<ResumoBackup>("/api/backup/validar", arquivo),
+  });
+
+  const restaurarBackup = useMutation({
+    mutationFn: (arquivo: File) => api.enviarArquivo<ResultadoRestore>("/api/backup/restaurar", arquivo),
   });
 
   const disponiveis = funcoesQuePodeCriar(usuario?.funcao);
@@ -345,34 +392,139 @@ export default function TelaConfiguracoes() {
     }
   }
 
-  async function backup() {
-    const [produtos, vendas, ordens, vendedores, clientes] = await Promise.all([
-      api.obter("/api/produtos"),
-      api.obter("/api/vendas"),
-      api.obter("/api/ordens-servico"),
-      api.obter("/api/vendedores"),
-      api.obter<Cliente[]>("/api/clientes"),
-    ]);
-
-    const conteudo = JSON.stringify(
-      { geradoEm: new Date().toISOString(), produtos, vendas, ordens, vendedores, clientes, configuracao },
-      null,
-      2,
-    );
-
-    const baixou = baixarTexto(
-      `brinkpdv-backup-${new Date().toISOString().split("T")[0]}.json`,
-      conteudo,
-      "application/json",
-    );
-
-    avisar({
-      titulo: baixou ? "Backup gerado" : "Backup indisponível",
-      descricao: baixou
-        ? "O arquivo JSON foi baixado com sucesso"
-        : "O download de arquivos só está disponível na versão web",
-      variante: baixou ? "padrao" : "perigo",
+  function abrirDialogoServico(servico?: Servico) {
+    setServicoSelecionado(servico ?? null);
+    setFormularioServico({
+      nome: servico?.nome ?? "",
+      descricao: servico?.descricao ?? "",
+      precoPadrao: servico?.precoPadrao != null ? String(servico.precoPadrao).replace(".", ",") : "",
+      ativo: servico?.ativo ?? true,
     });
+    setDialogoServico(true);
+  }
+
+  async function salvarServico() {
+    if (!formularioServico.nome.trim()) {
+      avisar({ titulo: "Nome obrigatório", descricao: "Informe o nome do serviço.", variante: "perigo" });
+      return;
+    }
+
+    const payload = {
+      nome: formularioServico.nome.trim(),
+      descricao: formularioServico.descricao.trim() || null,
+      precoPadrao: formularioServico.precoPadrao ? paraNumero(formularioServico.precoPadrao) : null,
+      ativo: formularioServico.ativo,
+    };
+
+    try {
+      if (servicoSelecionado) {
+        await atualizarServico.mutateAsync({ id: servicoSelecionado.id, dados: payload });
+      } else {
+        await criarServico.mutateAsync(payload);
+      }
+
+      setDialogoServico(false);
+      avisar({ titulo: "Serviço salvo", descricao: "O cadastro de serviço foi atualizado." });
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao salvar serviço",
+        descricao: erro instanceof Error ? erro.message : "Não foi possível salvar o serviço.",
+        variante: "perigo",
+      });
+    }
+  }
+
+  async function excluirServico(id: string) {
+    try {
+      await removerServico.mutateAsync(id);
+      avisar({ titulo: "Serviço removido", descricao: "O serviço foi removido do cadastro." });
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao remover serviço",
+        descricao: erro instanceof Error ? erro.message : "Não foi possível remover o serviço.",
+        variante: "perigo",
+      });
+    }
+  }
+
+  async function backup() {
+    try {
+      setBackupResumo(null);
+      const arquivo = await criarBackup.mutateAsync();
+      const baixou = baixarBlob(arquivo.nomeArquivo, arquivo.blob);
+
+      setBackupResumo({
+        fileName: arquivo.nomeArquivo,
+        manifest: (arquivo.manifest as ResumoBackup["manifest"]) ?? {
+          format: "BRINKPDV_BACKUP",
+          version: 1,
+          createdAt: new Date().toISOString(),
+          applicationVersion: versao,
+          storeId: configuracao?.id ?? null,
+          storeName: configuracao?.nomeLoja ?? "BRINKPDV",
+          records: {},
+        },
+      });
+
+      avisar({
+        titulo: baixou ? "Backup criado" : "Backup indisponível",
+        descricao: baixou
+          ? `${arquivo.nomeArquivo} foi baixado para este computador.`
+          : "O download de arquivos só está disponível na versão web.",
+        variante: baixou ? "padrao" : "perigo",
+      });
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao criar backup",
+        descricao: erro instanceof Error ? erro.message : "Não foi possível criar o backup.",
+        variante: "perigo",
+      });
+    }
+  }
+
+  async function selecionarBackup() {
+    const arquivo = await escolherBackupBrink();
+
+    if (!arquivo) {
+      return;
+    }
+
+    try {
+      const resumo = await validarBackup.mutateAsync(arquivo);
+      setArquivoBackup(arquivo);
+      setRestoreResumo(resumo);
+      setResultadoRestore(null);
+      avisar({ titulo: "Backup validado", descricao: "Confira o resumo antes de restaurar." });
+    } catch (erro) {
+      setArquivoBackup(null);
+      setRestoreResumo(null);
+      avisar({
+        titulo: "Backup inválido",
+        descricao: erro instanceof Error ? erro.message : "Selecione um arquivo .brinkbackup compatível.",
+        variante: "perigo",
+      });
+    }
+  }
+
+  async function confirmarRestore() {
+    if (!arquivoBackup) {
+      return;
+    }
+
+    try {
+      const resultado = await restaurarBackup.mutateAsync(arquivoBackup);
+      setResultadoRestore(resultado);
+      setRestoreResumo(null);
+      setArquivoBackup(null);
+      clienteConsultas.invalidateQueries();
+      avisar({ titulo: "Backup restaurado", descricao: resultado.mensagem });
+    } catch (erro) {
+      avisar({
+        titulo: "Erro ao restaurar",
+        descricao: erro instanceof Error ? erro.message : "Nenhuma alteração parcial foi confirmada.",
+        variante: "perigo",
+      });
+    }
   }
 
   async function abrirAtualizacoes() {
@@ -954,23 +1106,164 @@ export default function TelaConfiguracoes() {
         ]}
       </Grade>
 
-      <Cartao testID="card-backup">
+      <Cartao testID="card-services-management">
         <View style={{ padding: espaco.lg, gap: espaco.md }}>
-          <TituloSecao icone={<Database size={20} color={cores.primaria} />} texto="Backup do Sistema" />
+          <View
+            style={{
+              flexDirection: ehDesktop ? "row" : "column",
+              justifyContent: "space-between",
+              alignItems: ehDesktop ? "center" : "flex-start",
+              gap: espaco.md,
+            }}
+          >
+            <TituloSecao icone={<Wrench size={20} color={cores.primaria} />} texto="Serviços" />
+            <Botao
+              testID="button-new-service"
+              titulo="Novo Serviço"
+              icone={<Plus size={16} color={cores.primariaTexto} />}
+              onPress={() => abrirDialogoServico()}
+            />
+          </View>
 
           <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
-            Baixa um JSON com produtos, vendas, ordens de serviço, clientes, vendedores e configurações.
-            A importação do outro PDV da loja será feita em um projeto à parte.
+            O preço padrão é opcional. Na venda ou OS, o valor cobrado fica salvo no item transacional.
+          </Text>
+
+          {servicos.length === 0 ? (
+            <Text style={{ color: cores.suaveTexto }}>Nenhum serviço cadastrado.</Text>
+          ) : (
+            <View style={{ borderWidth: 1, borderColor: cores.borda, borderRadius: raio.medio, paddingHorizontal: espaco.lg }}>
+              <Tabela larguraMinima={720}>
+                <LinhaTabela cabecalho>
+                  <CelulaTabela cabecalho proporcao={2}>
+                    Serviço
+                  </CelulaTabela>
+                  <CelulaTabela cabecalho proporcao={2}>
+                    Descrição
+                  </CelulaTabela>
+                  <CelulaTabela cabecalho proporcao={1.2}>
+                    Preço padrão
+                  </CelulaTabela>
+                  <CelulaTabela cabecalho proporcao={1}>
+                    Status
+                  </CelulaTabela>
+                  <CelulaTabela cabecalho proporcao={1} alinhamento="flex-end">
+                    Ações
+                  </CelulaTabela>
+                </LinhaTabela>
+
+                {servicos.map((servico) => (
+                  <LinhaTabela key={servico.id} testID={`row-service-${servico.id}`}>
+                    <CelulaTabela proporcao={2} estiloTexto={{ fontWeight: "500" }}>
+                      {servico.nome}
+                    </CelulaTabela>
+                    <CelulaTabela proporcao={2}>{servico.descricao ?? "-"}</CelulaTabela>
+                    <CelulaTabela proporcao={1.2}>
+                      {servico.precoPadrao != null ? moeda(servico.precoPadrao) : "Definir na venda/OS"}
+                    </CelulaTabela>
+                    <CelulaTabela proporcao={1}>
+                      <Selo texto={servico.ativo ? "Ativo" : "Inativo"} variante={servico.ativo ? "primario" : "suave"} />
+                    </CelulaTabela>
+                    <CelulaTabela proporcao={1} alinhamento="flex-end">
+                      <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: espaco.sm }}>
+                        <Botao
+                          testID={`button-edit-service-${servico.id}`}
+                          variante="fantasma"
+                          tamanho="icone"
+                          onPress={() => abrirDialogoServico(servico)}
+                          icone={<Pencil size={16} color={cores.texto} />}
+                        />
+                        <Botao
+                          testID={`button-delete-service-${servico.id}`}
+                          variante="fantasma"
+                          tamanho="icone"
+                          onPress={() => excluirServico(servico.id)}
+                          icone={<Trash2 size={16} color={cores.texto} />}
+                        />
+                      </View>
+                    </CelulaTabela>
+                  </LinhaTabela>
+                ))}
+              </Tabela>
+            </View>
+          )}
+        </View>
+      </Cartao>
+
+      <Cartao testID="card-backup">
+        <View style={{ padding: espaco.lg, gap: espaco.md }}>
+          <TituloSecao icone={<Database size={20} color={cores.primaria} />} texto="Backup e Restauração" />
+
+          <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+            Gera um arquivo .brinkbackup com banco completo, incluindo produtos, serviços, vendas,
+            clientes, usuários, caixa, configurações e ordens de serviço.
           </Text>
 
           <View style={{ flexDirection: "row", gap: espaco.lg, flexWrap: "wrap" }}>
             <Botao
               testID="button-backup"
               titulo="Fazer Backup Agora"
+              carregando={criarBackup.isPending}
               icone={<Download size={16} color={cores.primariaTexto} />}
               onPress={backup}
             />
+            <Botao
+              testID="button-select-backup"
+              titulo="Importar Backup"
+              variante="contorno"
+              carregando={validarBackup.isPending}
+              onPress={selecionarBackup}
+            />
           </View>
+
+          {backupResumo ? (
+            <ResumoManifest
+              titulo="Backup criado"
+              nomeArquivo={backupResumo.fileName}
+              manifest={backupResumo.manifest}
+            />
+          ) : null}
+
+          {restoreResumo ? (
+            <View style={{ gap: espaco.md, borderWidth: 1, borderColor: cores.borda, borderRadius: raio.medio, padding: espaco.md }}>
+              <ResumoManifest
+                titulo="Backup encontrado"
+                nomeArquivo={restoreResumo.fileName}
+                manifest={restoreResumo.manifest}
+              />
+              <View style={{ flexDirection: "row", gap: espaco.sm, flexWrap: "wrap" }}>
+                <Botao
+                  testID="button-cancel-restore"
+                  variante="contorno"
+                  titulo="Cancelar"
+                  onPress={() => {
+                    setArquivoBackup(null);
+                    setRestoreResumo(null);
+                  }}
+                />
+                <Botao
+                  testID="button-confirm-restore"
+                  variante="perigo"
+                  titulo="Restaurar"
+                  carregando={restaurarBackup.isPending}
+                  onPress={confirmarRestore}
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {resultadoRestore ? (
+            <View style={{ gap: espaco.xs }}>
+              <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "600" }}>
+                {resultadoRestore.mensagem}
+              </Text>
+              {resultadoRestore.preventiveBackupFileName ? (
+                <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+                  Backup preventivo criado no servidor: {resultadoRestore.preventiveBackupFileName}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </Cartao>
 
@@ -1120,6 +1413,92 @@ export default function TelaConfiguracoes() {
           </Text>
         </View>
       </Dialogo>
+
+      <Dialogo
+        aberto={dialogoServico}
+        onFechar={() => setDialogoServico(false)}
+        titulo={servicoSelecionado ? "Editar Serviço" : "Novo Serviço"}
+        descricao="O preço padrão é opcional e pode ser alterado no momento da venda ou OS."
+        testID="dialog-service"
+        rodape={
+          <>
+            <Botao variante="contorno" titulo="Cancelar" onPress={() => setDialogoServico(false)} />
+            <Botao
+              testID="button-save-service"
+              titulo="Salvar Serviço"
+              carregando={criarServico.isPending || atualizarServico.isPending}
+              onPress={salvarServico}
+            />
+          </>
+        }
+      >
+        <View style={{ gap: espaco.sm }}>
+          <Rotulo>Nome *</Rotulo>
+          <Campo
+            testID="input-service-name"
+            valor={formularioServico.nome}
+            onChange={(texto) => setFormularioServico((atual) => ({ ...atual, nome: texto }))}
+            placeholder="Ex: Troca de conector"
+          />
+        </View>
+
+        <View style={{ gap: espaco.sm }}>
+          <Rotulo>Descrição</Rotulo>
+          <Campo
+            testID="input-service-description"
+            valor={formularioServico.descricao}
+            onChange={(texto) => setFormularioServico((atual) => ({ ...atual, descricao: texto }))}
+            placeholder="Opcional"
+          />
+        </View>
+
+        <View style={{ gap: espaco.sm }}>
+          <Rotulo>Preço padrão (opcional)</Rotulo>
+          <Campo
+            testID="input-service-default-price"
+            valor={formularioServico.precoPadrao}
+            onChange={(texto) => setFormularioServico((atual) => ({ ...atual, precoPadrao: texto }))}
+            placeholder="Definir na venda/OS"
+            teclado="decimal-pad"
+          />
+        </View>
+
+        <LinhaPreferencia titulo="Serviço ativo" descricao="Serviços inativos ficam fora das sugestões de venda/OS">
+          <Interruptor
+            testID="switch-service-active"
+            valor={formularioServico.ativo}
+            onChange={(ativo) => setFormularioServico((atual) => ({ ...atual, ativo }))}
+          />
+        </LinhaPreferencia>
+      </Dialogo>
+    </View>
+  );
+}
+
+function ResumoManifest({
+  titulo,
+  nomeArquivo,
+  manifest,
+}: {
+  titulo: string;
+  nomeArquivo: string;
+  manifest: ResumoBackup["manifest"];
+}) {
+  const { cores } = useTema();
+  const registros = Object.entries(manifest.records);
+
+  return (
+    <View style={{ gap: espaco.sm }}>
+      <Text style={{ color: cores.texto, fontSize: fonte.base, fontWeight: "600" }}>{titulo}</Text>
+      <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>Arquivo: {nomeArquivo}</Text>
+      <Text style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
+        Loja: {manifest.storeName} • Criado em: {dataCurta(manifest.createdAt)}
+      </Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: espaco.sm }}>
+        {registros.map(([entidade, total]) => (
+          <Selo key={entidade} texto={`${entidade}: ${total}`} variante="contorno" />
+        ))}
+      </View>
     </View>
   );
 }

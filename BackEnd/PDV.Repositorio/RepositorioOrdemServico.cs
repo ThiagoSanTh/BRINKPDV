@@ -24,7 +24,8 @@ public class RepositorioOrdemServico : IRepositorioOrdemServico
 
         if (!string.IsNullOrWhiteSpace(status))
         {
-            consulta = consulta.Where(ordem => ordem.Status == status);
+            var statusNormalizado = StatusOrdemServico.Normalizar(status).ToLower();
+            consulta = consulta.Where(ordem => ordem.Status.ToLower() == statusNormalizado);
         }
 
         if (!string.IsNullOrWhiteSpace(clienteId))

@@ -22,6 +22,38 @@ public class ServicoProduto : IServicoProduto
         return produtos.Select(produto => produto.ParaDto()).ToList();
     }
 
+    public async Task<IReadOnlyList<CategoriaProdutoDto>> ListarCategoriasAsync(CancellationToken cancelamento = default)
+    {
+        var produtos = await _repositorio.ObterTodosAsync(cancelamento);
+        return produtos
+            .GroupBy(produto => produto.Categoria.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(grupo =>
+            {
+                var itens = grupo.ToList();
+                return new CategoriaProdutoDto(
+                    itens[0].Categoria.Trim(),
+                    itens.Count,
+                    itens.Sum(produto => produto.Estoque),
+                    itens.Sum(produto => produto.Preco * produto.Estoque));
+            })
+            .OrderByDescending(categoria => categoria.Quantidade)
+            .ThenBy(categoria => categoria.Nome)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ProdutoDto>> ListarPorCategoriaAsync(
+        string categoria,
+        CancellationToken cancelamento = default)
+    {
+        if (string.IsNullOrWhiteSpace(categoria))
+        {
+            throw new RegraNegocioException("Informe a categoria.");
+        }
+
+        var produtos = await _repositorio.ObterPorCategoriaAsync(categoria, cancelamento);
+        return produtos.Select(produto => produto.ParaDto()).ToList();
+    }
+
     public async Task<ProdutoDto?> ObterAsync(string id, CancellationToken cancelamento = default)
     {
         var produto = await _repositorio.ObterPorIdAsync(id, cancelamento);
@@ -81,6 +113,56 @@ public class ServicoProduto : IServicoProduto
 
         var atualizado = await _repositorio.AtualizarAsync(produto, cancelamento);
         return atualizado?.ParaDto();
+    }
+
+    public async Task<CategoriaProdutoDto> AtualizarCategoriaAsync(
+        string categoriaAtual,
+        CategoriaAtualizacaoDto entrada,
+        CancellationToken cancelamento = default)
+    {
+        if (string.IsNullOrWhiteSpace(categoriaAtual))
+        {
+            throw new RegraNegocioException("Informe a categoria atual.");
+        }
+
+        var novoNome = entrada.Nome.Trim();
+
+        if (string.IsNullOrWhiteSpace(novoNome))
+        {
+            throw new RegraNegocioException("Informe o novo nome da categoria.");
+        }
+
+        if (novoNome.Length > 120)
+        {
+            throw new RegraNegocioException("O nome da categoria deve ter no máximo 120 caracteres.");
+        }
+
+        var categorias = await ListarCategoriasAsync(cancelamento);
+        var atual = categorias.FirstOrDefault(
+            categoria => string.Equals(categoria.Nome, categoriaAtual.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        if (atual is null)
+        {
+            throw new RecursoNaoEncontradoException("Categoria não encontrada.");
+        }
+
+        var duplicada = categorias.Any(
+            categoria => !string.Equals(categoria.Nome, categoriaAtual.Trim(), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(categoria.Nome, novoNome, StringComparison.OrdinalIgnoreCase));
+
+        if (duplicada)
+        {
+            throw new RegraNegocioException("Já existe uma categoria com esse nome.");
+        }
+
+        await _repositorio.RenomearCategoriaAsync(categoriaAtual, novoNome, cancelamento);
+
+        var produtos = await _repositorio.ObterPorCategoriaAsync(novoNome, cancelamento);
+        return new CategoriaProdutoDto(
+            novoNome,
+            produtos.Count,
+            produtos.Sum(produto => produto.Estoque),
+            produtos.Sum(produto => produto.Preco * produto.Estoque));
     }
 
     public Task<bool> RemoverAsync(string id, CancellationToken cancelamento = default)
