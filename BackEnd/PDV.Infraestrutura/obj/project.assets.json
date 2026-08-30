@@ -2127,7 +2127,7 @@
     ]
   },
   "packageFolders": {
-    "/tmp/cursor-sandbox-cache/250e9b94bf1533904f7ede9a596afdfe/nuget": {}
+    "/tmp/cursor-sandbox-cache/44a647d3e42518d23479aed5ba100658/nuget": {}
   },
   "project": {
     "version": "1.0.0",
@@ -2135,7 +2135,7 @@
       "projectUniqueName": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj",
       "projectName": "PDV.Infraestrutura",
       "projectPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/PDV.Infraestrutura.csproj",
-      "packagesPath": "/tmp/cursor-sandbox-cache/250e9b94bf1533904f7ede9a596afdfe/nuget",
+      "packagesPath": "/tmp/cursor-sandbox-cache/44a647d3e42518d23479aed5ba100658/nuget",
       "outputPath": "/home/thsanth/Área de trabalho/BRINKPDV/BackEnd/PDV.Infraestrutura/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
