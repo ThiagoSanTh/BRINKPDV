@@ -27,7 +27,7 @@ public static class Mapeador
         item.Desconto,
         item.Total);
 
-    public static ServicoDto ParaDto(this Servico servico) => new(
+    public static ServicoDto ParaDto(this PDV.Dominio.Entidades.Servico servico) => new(
         servico.Id,
         servico.Nome,
         servico.Descricao,

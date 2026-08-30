@@ -38,7 +38,7 @@ public class ServicoServico : IServicoServico
             throw new RegraNegocioException("Já existe um serviço com esse nome.");
         }
 
-        var servico = new Servico
+        var servico = new PDV.Dominio.Entidades.Servico
         {
             Nome = entrada.Nome.Trim(),
             Descricao = string.IsNullOrWhiteSpace(entrada.Descricao) ? null : entrada.Descricao.Trim(),

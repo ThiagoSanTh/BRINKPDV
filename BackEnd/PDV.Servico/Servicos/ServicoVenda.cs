@@ -94,16 +94,16 @@ public class ServicoVenda : IServicoVenda
                 var servico = await _repositorioServico.ObterPorIdAsync(itemEntrada.ServicoId, cancelamento)
                     ?? throw new RecursoNaoEncontradoException($"Serviço {itemEntrada.ServicoId} não encontrado.");
 
-                var precoUnitario = itemEntrada.PrecoUnitario ?? servico.PrecoPadrao;
+                var precoServico = itemEntrada.PrecoUnitario ?? servico.PrecoPadrao;
 
-                if (precoUnitario is null or <= 0)
+                if (precoServico is null or <= 0)
                 {
                     throw new RegraNegocioException($"Informe o valor cobrado para {servico.Nome}.");
                 }
 
-                var desconto = Math.Max(0, itemEntrada.Desconto);
+                var descontoServico = Math.Max(0, itemEntrada.Desconto);
 
-                if (desconto > precoUnitario.Value * itemEntrada.Quantidade)
+                if (descontoServico > precoServico.Value * itemEntrada.Quantidade)
                 {
                     throw new RegraNegocioException($"O desconto de {servico.Nome} é maior que o valor do item.");
                 }
@@ -115,8 +115,8 @@ public class ServicoVenda : IServicoVenda
                     Tipo = TiposItemTransacional.Servico,
                     Nome = servico.Nome,
                     Quantidade = itemEntrada.Quantidade,
-                    PrecoUnitario = precoUnitario.Value,
-                    Desconto = desconto,
+                    PrecoUnitario = precoServico.Value,
+                    Desconto = descontoServico,
                 });
 
                 continue;

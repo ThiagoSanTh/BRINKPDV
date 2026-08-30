@@ -92,7 +92,7 @@ public class OrdemServicoMapeamento : IEntityTypeConfiguration<OrdemServico>
         builder.Property(ordem => ordem.Itens)
             .HasColumnName("items")
             .HasColumnType("text")
-            .HasDefaultValue("[]")
+            .HasDefaultValueSql("'[]'::text")
             .HasConversion(new ConversorItensOrdemServico(), new ComparadorItensOrdemServico())
             .IsRequired();
 

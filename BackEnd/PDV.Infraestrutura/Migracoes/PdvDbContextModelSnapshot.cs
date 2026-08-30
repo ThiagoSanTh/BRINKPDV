@@ -242,7 +242,7 @@ namespace PDV.Infraestrutura.Migracoes
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("[]")
+                        .HasDefaultValueSql("'[]'::text")
                         .HasColumnName("items");
 
                     b.Property<string>("Marca")

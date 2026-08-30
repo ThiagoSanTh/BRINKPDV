@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PDV.Servico", "PDV.Servico\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PDV.WebApi", "PDV.WebApi\PDV.WebApi.csproj", "{21471EA4-F44D-4AC1-957A-0325BFB570F6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PDV.Tests", "PDV.Tests\PDV.Tests.csproj", "{DD4B97AE-EDFF-4C49-9587-3A5937AEC99A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{21471EA4-F44D-4AC1-957A-0325BFB570F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{21471EA4-F44D-4AC1-957A-0325BFB570F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{21471EA4-F44D-4AC1-957A-0325BFB570F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DD4B97AE-EDFF-4C49-9587-3A5937AEC99A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD4B97AE-EDFF-4C49-9587-3A5937AEC99A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD4B97AE-EDFF-4C49-9587-3A5937AEC99A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD4B97AE-EDFF-4C49-9587-3A5937AEC99A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

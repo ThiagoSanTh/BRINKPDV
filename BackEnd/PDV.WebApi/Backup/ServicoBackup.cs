@@ -194,7 +194,7 @@ public class ServicoBackup
                 Vendedores = await LerJsonAsync<List<Vendedor>>(zip, "database/vendedores.json", cancelamento),
                 Categorias = await LerJsonAsync<List<string>>(zip, "database/categorias.json", cancelamento),
                 Produtos = await LerJsonAsync<List<Produto>>(zip, "database/produtos.json", cancelamento),
-                Servicos = await LerJsonAsync<List<Servico>>(zip, "database/servicos.json", cancelamento),
+                Servicos = await LerJsonAsync<List<PDV.Dominio.Entidades.Servico>>(zip, "database/servicos.json", cancelamento),
                 Vendas = await LerJsonAsync<List<Venda>>(zip, "database/vendas.json", cancelamento),
                 OrdensServico = await LerJsonAsync<List<OrdemServico>>(zip, "database/ordens_servico.json", cancelamento),
                 MovimentosCaixa = await LerJsonAsync<List<MovimentoCaixa>>(zip, "database/movimentos_caixa.json", cancelamento),
@@ -411,7 +411,7 @@ public class ServicoBackup
         public List<Vendedor> Vendedores { get; set; } = [];
         public List<string> Categorias { get; set; } = [];
         public List<Produto> Produtos { get; set; } = [];
-        public List<Servico> Servicos { get; set; } = [];
+        public List<PDV.Dominio.Entidades.Servico> Servicos { get; set; } = [];
         public List<Venda> Vendas { get; set; } = [];
         public List<OrdemServico> OrdensServico { get; set; } = [];
         public List<MovimentoCaixa> MovimentosCaixa { get; set; } = [];

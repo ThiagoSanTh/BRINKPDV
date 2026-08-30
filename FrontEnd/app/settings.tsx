@@ -1313,7 +1313,7 @@ export default function TelaConfiguracoes() {
             "Comissões de vendedores",
             "Relatórios e estatísticas",
             "Impressão de recibos e comprovantes",
-            "Backup dos dados em JSON",
+            "Backup completo em arquivo .brinkbackup",
           ].map((nota) => (
             <Text key={nota} style={{ color: cores.suaveTexto, fontSize: fonte.sm }}>
               ✅ {nota}
